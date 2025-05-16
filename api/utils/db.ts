@@ -11,6 +11,12 @@ const dbConfig = {
   max: 10, // Adjust as needed (connectionLimit in mysql2)
   idleTimeoutMillis: 30000, // Close idle connections after 30 seconds
   connectionTimeoutMillis: 2000, // Return an error after 2 seconds if connection could not be established
+  // Add SSL configuration, often required by cloud databases like Render
+  ssl: {
+    // This is often needed for self-signed certs or when the CA is not in Node's default trust store
+    // In production, consider fetching the CA certificate and using `ca: fs.readFileSync('ca.crt')`
+    rejectUnauthorized: false,
+  },
 };
 
 // Create a connection pool
@@ -30,7 +36,7 @@ function getPool(): Pool {
     // Optional: Add error handling for the pool
     pool.on('error', (err, client) => {
         console.error('Unexpected error on idle client', err);
-        process.exit(-1); // Exit the process if a client in the pool has an error
+        // process.exit(-1); // Exiting might be too aggressive in a serverless function
     });
   }
   return pool;
