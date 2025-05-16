@@ -5,7 +5,7 @@ import { sendApiResponse } from '../utils/apiResponse';
 import { authMiddleware } from '../utils/authMiddleware';
 import { generateMockToken } from '../utils/authMiddleware'; // Corrected import path
 // Import necessary types
-import { User, Player, Coach, Game, Batch, Payment, TrainingSession, Attendance, PerformanceNote } from '@/types/database.types'; // Import PerformanceNote
+import { User, Player, Coach, Game, Batch, Payment, TrainingSession, Attendance, PerformanceNote, PerformanceNoteSeed } from '@/types/database.types'; // Import PerformanceNote and PerformanceNoteSeed
 import { PoolClient } from 'pg'; // Import PoolClient type
 
 // Define interfaces for the seed data structure (excluding auto-generated fields)
@@ -18,7 +18,8 @@ interface CoachSeed extends Omit<Coach, 'id' | 'userId' | 'createdAt' | 'updated
 interface GameSeed extends Omit<Game, 'id' | 'createdAt' | 'updatedAt'> {}
 interface BatchSeed extends Omit<Batch, 'id' | 'createdAt' | 'updatedAt'> {}
 interface PaymentSeed extends Omit<Payment, 'id' | 'createdAt' | 'updatedAt'> { date: string; } // Allow string for date in seed
-interface PerformanceNoteSeed extends Omit<PerformanceNote, 'id' | 'createdAt' | 'updatedAt'> { date: string; } // Use PerformanceNote, allow string for date
+// Use the imported PerformanceNoteSeed type
+// interface PerformanceNoteSeed extends Omit<PerformanceNote, 'id' | 'createdAt' | 'updatedAt'> { date: string; } // Use PerformanceNote, allow string for date
 interface PlayerGameSeed { player_id: number; game_id: number; }
 interface TrainingSessionSeed extends Omit<TrainingSession, 'id' | 'createdAt' | 'updatedAt'> { date: string; } // Allow string for date in seed
 interface AttendanceSeed extends Omit<Attendance, 'id' | 'createdAt' | 'updatedAt'> { created_at?: string; updated_at?: string; } // Allow string for date in seed
@@ -33,7 +34,7 @@ const initialSeedData: {
     games: GameSeed[];
     batches: BatchSeed[];
     payments: PaymentSeed[];
-    performance_notes: PerformanceNoteSeed[];
+    performance_notes: PerformanceNoteSeed[]; // Use the updated type
     player_games: PlayerGameSeed[];
     training_sessions: TrainingSessionSeed[];
     attendance: AttendanceSeed[];
@@ -86,11 +87,11 @@ const initialSeedData: {
         { id: 5, playerId: 3, date: '2025-05-01', amount: 150.00, description: 'Monthly Fee' },
     ],
     performance_notes: [
-        // Removed mock IDs, link via player/coach if needed for lookup
-        { id: 1, playerId: 1, date: '2025-05-10', note: 'Significant improvement in backhand technique', coachId: 1 },
-        { id: 2, playerId: 2, date: '2025-05-12', note: 'Good stamina during drills', coachId: 1 },
-        { id: 4, playerId: 3, date: '2025-05-18', note: 'Strong performance in freestyle', coachId: 2 },
-        { id: 5, playerId: 4, date: '2025-05-18', note: 'Improving dive technique', coachId: 2 },
+        // Removed explicit 'id' properties
+        { playerId: 1, date: '2025-05-10', note: 'Significant improvement in backhand technique', coachId: 1 },
+        { playerId: 2, date: '2025-05-12', note: 'Good stamina during drills', coachId: 1 },
+        { playerId: 3, date: '2025-05-18', note: 'Strong performance in freestyle', coachId: 2 },
+        { playerId: 4, date: '2025-05-18', note: 'Improving dive technique', coachId: 2 },
     ],
     player_games: [
         // Removed SQL comments
@@ -341,12 +342,12 @@ INSERT INTO payments (id, player_id, date, amount, description, created_at, upda
 SELECT setval('payments_id_seq', (SELECT MAX(id) FROM payments));
 
 
-INSERT INTO performance_notes (id, player_id, coach_id, date, note, created_at, updated_at) VALUES
-(1, 1, 1, '2025-05-10', 'Significant improvement in backhand technique', NOW(), NOW()),
-(2, 2, 1, '2025-05-12', 'Good stamina during drills', NOW(), NOW()),
+INSERT INTO performance_notes (player_id, coach_id, date, note, created_at, updated_at) VALUES
+(1, 1, '2025-05-10', 'Significant improvement in backhand technique', NOW(), NOW()),
+(2, 1, '2025-05-12', 'Good stamina during drills', NOW(), NOW()),
 -- Note 3 skipped
-(4, 3, 2, '2025-05-18', 'Strong performance in freestyle', NOW(), NOW()),
-(5, 4, 2, '2025-05-18', 'Improving dive technique', NOW(), NOW());
+(3, 2, '2025-05-18', 'Strong performance in freestyle', NOW(), NOW()),
+(4, 2, '2025-05-18', 'Improving dive technique', NOW(), NOW());
 
 SELECT setval('performance_notes_id_seq', (SELECT MAX(id) FROM performance_notes));
 
@@ -411,3 +412,4 @@ export default authMiddleware(async (req: VercelRequest & { user?: Omit<User, 'p
         }
     }
 }, ['admin']); // Ensure only users with the 'admin' role can access this endpoint
+
