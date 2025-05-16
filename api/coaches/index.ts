@@ -1,9 +1,10 @@
 // api/coaches/index.ts
 import { VercelRequest, VercelResponse } from '@vercel/node';
-import { getConnection } from '../utils/db'; // Corrected import path
-import { sendApiResponse } from '../utils/apiResponse'; // Corrected import path
-import { authMiddleware } from '../utils/authMiddleware'; // Corrected import path
-import { Coach } from '@/types/database.types'; // Import Coach type
+import { getConnection } from '../utils/db';
+import { sendApiResponse } from '../utils/apiResponse';
+import { authMiddleware } from '../utils/authMiddleware';
+import { Coach } from '@/types/database.types';
+import { PoolClient } from 'pg'; // Import PoolClient type
 
 // Wrap the handler with authMiddleware
 export default authMiddleware(async (req: any, res: VercelResponse) => { // Use 'any' for req to access req.user
@@ -20,21 +21,22 @@ export default authMiddleware(async (req: any, res: VercelResponse) => { // Use 
     }
 
 
-    let connection;
+    let client: PoolClient | undefined; // Use PoolClient type
     try {
-        connection = await getConnection();
+        client = await getConnection();
 
         // Fetch all coaches (simplified - does not include user info)
-        const [rows] = await connection.execute('SELECT id, user_id, first_name, last_name, specialization, experience, created_at, updated_at FROM coaches');
+        const result = await client.query('SELECT id, user_id, first_name, last_name, specialization, experience, created_at, updated_at FROM coaches');
 
-        sendApiResponse(res, true, rows as Coach[], undefined, 200);
+        sendApiResponse(res, true, result.rows as Coach[], undefined, 200);
 
     } catch (error) {
         console.error('Get all coaches error:', error);
         sendApiResponse(res, false, undefined, error instanceof Error ? error.message : 'Failed to fetch coaches', 500);
     } finally {
-        if (connection) {
-            connection.release();
+        if (client) {
+            client.release();
         }
     }
 }, ['admin', 'coach', 'player']); // Allow admin, coach, or player
+
