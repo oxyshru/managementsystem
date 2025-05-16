@@ -1,9 +1,10 @@
 // api/performance_notes/[id].ts
 import { VercelRequest, VercelResponse } from '@vercel/node';
-import { getConnection } from '../utils/db'; // Corrected import path
-import { sendApiResponse } from '../utils/apiResponse'; // Corrected import path
-import { authMiddleware } from '../utils/authMiddleware'; // Corrected import path
-import { PerformanceNote } from '@/types/database.types'; // Assuming you add PerformanceNote to types
+import { getConnection } from '../utils/db';
+import { sendApiResponse } from '../utils/apiResponse';
+import { authMiddleware } from '../utils/authMiddleware';
+import { PerformanceNote } from '@/types/database.types';
+import { PoolClient } from 'pg'; // Import PoolClient type
 
 // Wrap the handler with authMiddleware
 export default authMiddleware(async (req: any, res: VercelResponse) => { // Use 'any' for req to access req.user
@@ -14,13 +15,13 @@ export default authMiddleware(async (req: any, res: VercelResponse) => { // Use 
         return;
     }
 
-    let connection;
+    let client: PoolClient | undefined; // Use PoolClient type
     try {
-        connection = await getConnection();
+        client = await getConnection();
 
         // Fetch performance note by its ID
-        const [rows] = await connection.execute('SELECT id, player_id, coach_id, date, note, created_at, updated_at FROM performance_notes WHERE id = ?', [noteId]);
-        const note = (rows as any)[0];
+        const result = await client.query('SELECT id, player_id, coach_id, date, note, created_at, updated_at FROM performance_notes WHERE id = $1', [noteId]);
+        const note = result.rows[0];
 
         if (!note) {
             sendApiResponse(res, false, undefined, 'Performance note not found', 404);
@@ -28,8 +29,20 @@ export default authMiddleware(async (req: any, res: VercelResponse) => { // Use 
         }
 
         // Check if the authenticated user is an admin, the coach who created the note, or the player the note is about
-        const isNoteCreatorCoach = note.coach_id !== null && req.user.role === 'coach' && req.user.id === (await connection.execute('SELECT user_id FROM coaches WHERE id = ?', [note.coach_id]) as any)[0]?.user_id;
-        const isNoteSubjectPlayer = req.user.role === 'player' && req.user.id === (await connection.execute('SELECT user_id FROM players WHERE id = ?', [note.player_id]) as any)[0]?.user_id;
+         // Fetch the user_id for the related coach if coach_id is not null
+         let noteCreatorCoachUserId = null;
+         if (note.coach_id !== null) {
+             const coachUserResult = await client.query('SELECT user_id FROM coaches WHERE id = $1', [note.coach_id]);
+             noteCreatorCoachUserId = coachUserResult.rows[0]?.user_id || null;
+         }
+
+         // Fetch the user_id for the player the note is about
+         const noteSubjectPlayerUserResult = await client.query('SELECT user_id FROM players WHERE id = $1', [note.player_id]);
+         const noteSubjectPlayerUserId = noteSubjectPlayerUserResult.rows[0]?.user_id || null;
+
+
+        const isNoteCreatorCoach = note.coach_id !== null && req.user.role === 'coach' && req.user.id === noteCreatorCoachUserId;
+        const isNoteSubjectPlayer = req.user.role === 'player' && req.user.id === noteSubjectPlayerUserId;
 
 
         if (req.user.role !== 'admin' && !isNoteCreatorCoach && !isNoteSubjectPlayer) {
@@ -52,9 +65,10 @@ export default authMiddleware(async (req: any, res: VercelResponse) => { // Use 
             const { date, note: noteContent } = req.body; // Allow updating date and note content
             const updateFields: string[] = [];
             const updateValues: any[] = [];
+             let paramIndex = 1;
 
-            if (date !== undefined) { updateFields.push('date = ?'); updateValues.push(date); }
-            if (noteContent !== undefined) { updateFields.push('note = ?'); updateValues.push(noteContent); }
+            if (date !== undefined) { updateFields.push(`date = $${paramIndex++}`); updateValues.push(date); }
+            if (noteContent !== undefined) { updateFields.push(`note = $${paramIndex++}`); updateValues.push(noteContent); }
 
 
             if (updateFields.length === 0) {
@@ -62,13 +76,13 @@ export default authMiddleware(async (req: any, res: VercelResponse) => { // Use 
                 return;
             }
 
-            updateFields.push('updated_at = CURRENT_TIMESTAMP');
+            updateFields.push(`updated_at = CURRENT_TIMESTAMP`);
             updateValues.push(noteId); // Add note ID for the WHERE clause
 
-            const sql = `UPDATE performance_notes SET ${updateFields.join(', ')} WHERE id = ?`;
-            const [result] = await connection.execute(sql, updateValues);
+            const sql = `UPDATE performance_notes SET ${updateFields.join(', ')} WHERE id = $${paramIndex}`;
+            const result = await client.query(sql, updateValues);
 
-            sendApiResponse(res, true, { affectedRows: (result as any).affectedRows }, undefined, 200);
+            sendApiResponse(res, true, { affectedRows: result.rowCount }, undefined, 200); // Use rowCount for affected rows
 
 
         } else if (req.method === 'DELETE') {
@@ -78,9 +92,9 @@ export default authMiddleware(async (req: any, res: VercelResponse) => { // Use 
                 return;
             }
 
-            const [result] = await connection.execute('DELETE FROM performance_notes WHERE id = ?', [noteId]);
+            const result = await client.query('DELETE FROM performance_notes WHERE id = $1', [noteId]);
 
-            sendApiResponse(res, true, { affectedRows: (result as any).affectedRows }, undefined, 200);
+            sendApiResponse(res, true, { affectedRows: result.rowCount }, undefined, 200); // Use rowCount for affected rows
 
         } else {
             sendApiResponse(res, false, undefined, 'Method Not Allowed', 405);
@@ -90,8 +104,9 @@ export default authMiddleware(async (req: any, res: VercelResponse) => { // Use 
         console.error('Performance note endpoint error:', error);
         sendApiResponse(res, false, undefined, error instanceof Error ? error.message : 'Failed to process performance note request', 500);
     } finally {
-        if (connection) {
-            connection.release();
+        if (client) {
+            client.release();
         }
     }
 }, ['admin', 'coach', 'player']); // Allow admin, coach (all methods if related), player (GET if related)
+
