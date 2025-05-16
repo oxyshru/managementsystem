@@ -1,7 +1,7 @@
 // api/utils/authMiddleware.ts
 import { VercelRequest, VercelResponse } from '@vercel/node';
 import { sendApiResponse } from './apiResponse';
-import { User } from '@/types/database.types'; // Import User type
+import { User } from '../../src/types/database.types'; // Corrected import path
 
 // --- Simplified Mock Authentication ---
 // In a real app, you would use JWT (jsonwebtoken library)
@@ -106,3 +106,4 @@ export function authMiddleware(handler: (req: AuthenticatedRequest, res: VercelR
 
 // Export mock token functions for the auth endpoints
 export { generateMockToken, verifyMockToken };
+
