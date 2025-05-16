@@ -3,7 +3,7 @@ import { VercelRequest, VercelResponse } from '@vercel/node';
 import { getConnection } from './utils/db';
 import { sendApiResponse } from './utils/apiResponse';
 import { authMiddleware } from './utils/authMiddleware';
-import { PlayerStats, User } from '../src/types/database.types'; // Corrected import path
+import { PlayerStats, User } from '../src/types/database.types'; // Corrected import path and added PlayerStats
 import { PoolClient } from 'pg';
 
 // Wrap the handler with authMiddleware
@@ -195,4 +195,5 @@ export default authMiddleware(async (req: VercelRequest & { user?: Omit<User, 'p
         }
     }
 }, ['admin', 'coach', 'player']); // Allow admin (all methods), coach (GET, POST, PUT), player (GET their own)
+
 
