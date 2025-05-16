@@ -3,7 +3,7 @@ import { VercelRequest, VercelResponse } from '@vercel/node';
 import { getConnection } from './utils/db';
 import { sendApiResponse } from './utils/apiResponse';
 import { authMiddleware } from './utils/authMiddleware';
-import { Attendance, User } from '@/types/database.types';
+import { Attendance, User } from '../types/database.types'; // Changed import path
 import { PoolClient } from 'pg';
 
 // Wrap the handler with authMiddleware
@@ -216,7 +216,13 @@ export default authMiddleware(async (req: VercelRequest & { user?: Omit<User, 'p
                  return;
              }
 
-            const result = await client.query('DELETE FROM session_attendance WHERE id = $1', [attendanceId]);
+             const dependentAttendanceResult = await client.query('SELECT session_id FROM session_attendance WHERE session_id = $1', [sessionId]);
+             if (dependentAttendanceResult.rows.length > 0) {
+                 sendApiResponse(res, false, undefined, 'Cannot delete session: It has associated attendance records.', 409);
+                 return;
+             }
+
+            const result = await client.query('DELETE FROM session_attendance WHERE id = $1', [sessionId]);
 
             sendApiResponse(res, true, { affectedRows: result.rowCount }, undefined, 200);
 
@@ -233,3 +239,4 @@ export default authMiddleware(async (req: VercelRequest & { user?: Omit<User, 'p
         }
     }
 }, ['admin', 'coach', 'player']); // Allow admin, coach (all methods), player (GET their own)
+
