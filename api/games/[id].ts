@@ -1,9 +1,10 @@
 // api/games/[id].ts
 import { VercelRequest, VercelResponse } from '@vercel/node';
-import { getConnection } from '../utils/db'; // Corrected import path
-import { sendApiResponse } from '../utils/apiResponse'; // Corrected import path
-import { authMiddleware } from '../utils/authMiddleware'; // Corrected import path
-import { Game } from '@/types/database.types'; // Import Game type
+import { getConnection } from '../utils/db';
+import { sendApiResponse } from '../utils/apiResponse';
+import { authMiddleware } from '../utils/authMiddleware';
+import { Game } from '@/types/database.types';
+import { PoolClient } from 'pg'; // Import PoolClient type
 
 // Wrap the handler with authMiddleware
 export default authMiddleware(async (req: any, res: VercelResponse) => { // Use 'any' for req to access req.user
@@ -14,14 +15,14 @@ export default authMiddleware(async (req: any, res: VercelResponse) => { // Use 
         return;
     }
 
-    let connection;
+    let client: PoolClient | undefined; // Use PoolClient type
     try {
-        connection = await getConnection();
+        client = await getConnection();
 
         if (req.method === 'GET') {
             // Allow any authenticated user to get a specific game
-            const [rows] = await connection.execute('SELECT id, name, created_at, updated_at FROM games WHERE id = ?', [gameId]);
-            const game = (rows as any)[0];
+            const result = await client.query('SELECT id, name, created_at, updated_at FROM games WHERE id = $1', [gameId]);
+            const game = result.rows[0];
 
             if (game) {
                 sendApiResponse(res, true, game as Game, undefined, 200);
@@ -37,16 +38,16 @@ export default authMiddleware(async (req: any, res: VercelResponse) => { // Use 
             }
 
              // Optional: Check for dependencies (e.g., batches using this game) before deleting
-             const [dependentBatches] = await connection.execute('SELECT id FROM batches WHERE game_id = ?', [gameId]);
-             if ((dependentBatches as any).length > 0) {
+             const dependentBatchesResult = await client.query('SELECT id FROM batches WHERE game_id = $1', [gameId]);
+             if (dependentBatchesResult.rows.length > 0) {
                  sendApiResponse(res, false, undefined, 'Cannot delete game: It is linked to existing batches.', 409); // Conflict
                  return;
              }
 
 
-            const [result] = await connection.execute('DELETE FROM games WHERE id = ?', [gameId]);
+            const result = await client.query('DELETE FROM games WHERE id = $1', [gameId]);
 
-            sendApiResponse(res, true, { affectedRows: (result as any).affectedRows }, undefined, 200);
+            sendApiResponse(res, true, { affectedRows: result.rowCount }, undefined, 200); // Use rowCount for affected rows
 
         } else {
             sendApiResponse(res, false, undefined, 'Method Not Allowed', 405);
@@ -56,8 +57,9 @@ export default authMiddleware(async (req: any, res: VercelResponse) => { // Use 
         console.error('Game endpoint error:', error);
         sendApiResponse(res, false, undefined, error instanceof Error ? error.message : 'Failed to process game request', 500);
     } finally {
-        if (connection) {
-            connection.release();
+        if (client) {
+            client.release();
         }
     }
 }, ['admin', 'coach', 'player']); // Allow admin, coach, or player to view; only admin to delete
+
