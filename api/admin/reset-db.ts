@@ -88,11 +88,12 @@ const initialSeedData: {
     ],
     performance_notes: [
         // Corrected keys from playerId to player_id and coachId to coach_id
-        { player_id: 1, date: '2025-05-10', note: 'Significant improvement in backhand technique', coach_id: 1 },
-        { player_id: 2, date: '2025-05-12', note: 'Good stamina during drills', coach_id: 1 },
+        // Added created_at and updated_at as strings to match the SQL seed data structure
+        { player_id: 1, date: '2025-05-10', note: 'Significant improvement in backhand technique', coach_id: 1, created_at: '2025-05-10', updated_at: '2025-05-10' },
+        { player_id: 2, date: '2025-05-12', note: 'Good stamina during drills', coach_id: 1, created_at: '2025-05-12', updated_at: '2025-05-12' },
         // Note 3 skipped
-        { player_id: 3, date: '2025-05-18', note: 'Strong performance in freestyle', coach_id: 2 },
-        { player_id: 4, date: '2025-05-18', note: 'Improving dive technique', coach_id: 2 },
+        { player_id: 3, date: '2025-05-18', note: 'Strong performance in freestyle', coach_id: 2, created_at: '2025-05-18', updated_at: '2025-05-18' },
+        { player_id: 4, date: '2025-05-18', note: 'Improving dive technique', coach_id: 2, created_at: '2025-05-18', updated_at: '2025-05-18' },
     ],
     player_games: [
         // Removed SQL comments
@@ -320,7 +321,7 @@ SELECT setval('coaches_id_seq', (SELECT MAX(id) FROM coaches));
 
 INSERT INTO batches (id, game_id, name, schedule, coach_id, created_at, updated_at) VALUES
 (1, 1, 'Morning Batch', 'Mon, Wed, Fri 9:00 AM', 1, NOW(), NOW()),
-(2, 2, 'Evening Batch', 'Tue, Thu 4:00 PM', 2, NOW(), NOW());
+(2, 2, 'Evening Batch', 'Tue, Thu 4:00 PM', 2, NOW(), NOW');
 
 SELECT setval('batches_id_seq', (SELECT MAX(id) FROM batches));
 
@@ -343,12 +344,12 @@ INSERT INTO payments (id, player_id, date, amount, description, created_at, upda
 SELECT setval('payments_id_seq', (SELECT MAX(id) FROM payments));
 
 
-INSERT INTO performance_notes (player_id, coach_id, date, note, created_at, updated_at) VALUES
-(1, 1, '2025-05-10', 'Significant improvement in backhand technique', NOW(), NOW()),
-(2, 1, '2025-05-12', 'Good stamina during drills', NOW(), NOW()),
+INSERT INTO performance_notes (id, player_id, coach_id, date, note, created_at, updated_at) VALUES
+(1, 1, 1, 'Significant improvement in backhand technique', NOW(), NOW()),
+(2, 2, 1, 'Good stamina during drills', NOW(), NOW()),
 -- Note 3 skipped
-(3, 2, '2025-05-18', 'Strong performance in freestyle', NOW(), NOW()),
-(4, 2, '2025-05-18', 'Improving dive technique', NOW(), NOW());
+(3, 3, 2, 'Strong performance in freestyle', NOW(), NOW()),
+(4, 4, 2, 'Improving dive technique', NOW(), NOW());
 
 SELECT setval('performance_notes_id_seq', (SELECT MAX(id) FROM performance_notes));
 
@@ -413,4 +414,5 @@ export default authMiddleware(async (req: VercelRequest & { user?: Omit<User, 'p
         }
     }
 }, ['admin']); // Ensure only users with the 'admin' role can access this endpoint
+
 
