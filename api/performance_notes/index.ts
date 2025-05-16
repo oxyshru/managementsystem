@@ -1,15 +1,16 @@
 // api/performance_notes/index.ts
 import { VercelRequest, VercelResponse } from '@vercel/node';
-import { getConnection } from '../utils/db'; // Corrected import path
-import { sendApiResponse } from '../utils/apiResponse'; // Corrected import path
-import { authMiddleware } from '../utils/authMiddleware'; // Corrected import path
-import { PerformanceNote } from '@/types/database.types'; // Assuming you add PerformanceNote to types
+import { getConnection } from '../utils/db';
+import { sendApiResponse } from '../utils/apiResponse';
+import { authMiddleware } from '../utils/authMiddleware';
+import { PerformanceNote } from '@/types/database.types';
+import { PoolClient } from 'pg'; // Import PoolClient type
 
 // Wrap the handler with authMiddleware
 export default authMiddleware(async (req: any, res: VercelResponse) => { // Use 'any' for req to access req.user
-    let connection;
+    let client: PoolClient | undefined; // Use PoolClient type
     try {
-        connection = await getConnection();
+        client = await getConnection();
 
         if (req.method === 'GET') {
             // Allow admin to get all notes
@@ -19,30 +20,31 @@ export default authMiddleware(async (req: any, res: VercelResponse) => { // Use 
             let sql = 'SELECT id, player_id, coach_id, date, note, created_at, updated_at FROM performance_notes';
             const values: any[] = [];
             const conditions: string[] = [];
+            let paramIndex = 1; // Start index for PostgreSQL placeholders
 
             if (req.user.role === 'player') {
                  // Find the player ID for the current user
-                 const [playerRows] = await connection.execute('SELECT id FROM players WHERE user_id = ?', [req.user.id]);
-                 const player = (playerRows as any)[0];
+                 const playerResult = await client.query('SELECT id FROM players WHERE user_id = $1', [req.user.id]);
+                 const player = playerResult.rows[0];
 
                  if (!player) {
                       sendApiResponse(res, false, undefined, 'Player profile not found', 404);
                       return;
                  }
 
-                 conditions.push('player_id = ?');
+                 conditions.push(`player_id = $${paramIndex++}`);
                  values.push(player.id);
 
             } else if (req.user.role === 'coach') {
                  // Find the coach ID for the current user
-                 const [coachRows] = await connection.execute('SELECT id FROM coaches WHERE user_id = ?', [req.user.id]);
-                 const coach = (coachRows as any)[0];
+                 const coachResult = await client.query('SELECT id FROM coaches WHERE user_id = $1', [req.user.id]);
+                 const coach = coachResult.rows[0];
 
                  if (coach) {
                      // Get notes created by this coach OR notes for players in their batches
                      // Getting players in their batches requires JOINs.
                      // For simplicity, let's just get notes created by this coach for now.
-                     conditions.push('coach_id = ?');
+                     conditions.push(`coach_id = $${paramIndex++}`);
                      values.push(coach.id);
                      console.warn("Coach GET performance notes is simplified to only show notes created by the coach.");
                  } else {
@@ -59,11 +61,11 @@ export default authMiddleware(async (req: any, res: VercelResponse) => { // Use 
              // Allow filtering by player_id or coach_id if provided (for admin)
              if (req.user.role === 'admin') {
                   if (req.query.playerId !== undefined) {
-                       conditions.push('player_id = ?');
+                       conditions.push(`player_id = $${paramIndex++}`);
                        values.push(req.query.playerId);
                   }
                    if (req.query.coachId !== undefined) {
-                       conditions.push('coach_id = ?');
+                       conditions.push(`coach_id = $${paramIndex++}`);
                        values.push(req.query.coachId);
                    }
              }
@@ -77,8 +79,8 @@ export default authMiddleware(async (req: any, res: VercelResponse) => { // Use 
             sql += ' ORDER BY date DESC, created_at DESC';
 
 
-            const [rows] = await connection.execute(sql, values);
-            sendApiResponse(res, true, rows as PerformanceNote[], undefined, 200);
+            const result = await client.query(sql, values);
+            sendApiResponse(res, true, result.rows as PerformanceNote[], undefined, 200);
 
         } else if (req.method === 'POST') {
             // Allow admin or coaches to create performance notes
@@ -97,8 +99,8 @@ export default authMiddleware(async (req: any, res: VercelResponse) => { // Use 
              // If coach is creating, use their ID as coachId
              let actualCoachId = coachId;
              if (req.user.role === 'coach') {
-                  const [coachRows] = await connection.execute('SELECT id FROM coaches WHERE user_id = ?', [req.user.id]);
-                  actualCoachId = (coachRows as any)[0]?.id || null;
+                  const coachResult = await client.query('SELECT id FROM coaches WHERE user_id = $1', [req.user.id]);
+                  actualCoachId = coachResult.rows[0]?.id || null;
              }
              // If admin is creating, they might specify coachId or leave it null
 
@@ -107,18 +109,18 @@ export default authMiddleware(async (req: any, res: VercelResponse) => { // Use 
              // Skipping validation for demo simplicity
 
 
-            const [result] = await connection.execute(
-                'INSERT INTO performance_notes (player_id, coach_id, date, note) VALUES (?, ?, ?, ?)',
+            const result = await client.query(
+                'INSERT INTO performance_notes (player_id, coach_id, date, note) VALUES ($1, $2, $3, $4) RETURNING id', // Use $n placeholders and RETURNING
                 [playerId, actualCoachId, date, note]
             );
-            const newNoteId = (result as any).insertId;
+            const newNoteId = result.rows[0].id; // Get the inserted ID
 
-             // Fetch the newly created note to return its ID
-             const [newNoteRows] = await connection.execute('SELECT id FROM performance_notes WHERE id = ?', [newNoteId]);
-             const newNote = (newNoteRows as any)[0];
+             // Fetch the newly created note to return its ID (optional, can just return the ID)
+             // const newNoteResult = await client.query('SELECT id FROM performance_notes WHERE id = $1', [newNoteId]);
+             // const newNote = newNoteResult.rows[0];
 
 
-            sendApiResponse(res, true, { id: newNote.id }, undefined, 201); // 201 Created
+            sendApiResponse(res, true, { id: newNoteId }, undefined, 201); // 201 Created
 
         } else {
             sendApiResponse(res, false, undefined, 'Method Not Allowed', 405);
@@ -128,8 +130,9 @@ export default authMiddleware(async (req: any, res: VercelResponse) => { // Use 
         console.error('Performance notes endpoint error:', error);
         sendApiResponse(res, false, undefined, error instanceof Error ? error.message : 'Failed to process performance notes request', 500);
     } finally {
-        if (connection) {
-            connection.release();
+        if (client) {
+            client.release();
         }
     }
 }, ['admin', 'coach', 'player']); // Allow admin, coach (GET/POST), player (GET their own)
+
