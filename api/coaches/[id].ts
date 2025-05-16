@@ -1,9 +1,10 @@
 // api/coaches/[id].ts
 import { VercelRequest, VercelResponse } from '@vercel/node';
-import { getConnection } from '../utils/db'; // Corrected import path
-import { sendApiResponse } from '../utils/apiResponse'; // Corrected import path
-import { authMiddleware } from '../utils/authMiddleware'; // Corrected import path
-import { Coach } from '@/types/database.types'; // Import Coach type
+import { getConnection } from '../utils/db';
+import { sendApiResponse } from '../utils/apiResponse';
+import { authMiddleware } from '../utils/authMiddleware';
+import { Coach } from '@/types/database.types';
+import { PoolClient } from 'pg'; // Import PoolClient type
 
 // Wrap the handler with authMiddleware
 export default authMiddleware(async (req: any, res: VercelResponse) => { // Use 'any' for req to access req.user
@@ -14,13 +15,13 @@ export default authMiddleware(async (req: any, res: VercelResponse) => { // Use 
         return;
     }
 
-    let connection;
+    let client: PoolClient | undefined; // Use PoolClient type
     try {
-        connection = await getConnection();
+        client = await getConnection();
 
         // Fetch coach details (simplified - does not include user info)
-        const [rows] = await connection.execute('SELECT id, user_id, first_name, last_name, specialization, experience, created_at, updated_at FROM coaches WHERE id = ?', [coachId]);
-        const coach = (rows as any)[0];
+        const result = await client.query('SELECT id, user_id, first_name, last_name, specialization, experience, created_at, updated_at FROM coaches WHERE id = $1', [coachId]);
+        const coach = result.rows[0];
 
         if (!coach) {
             sendApiResponse(res, false, undefined, 'Coach not found', 404);
@@ -48,11 +49,12 @@ export default authMiddleware(async (req: any, res: VercelResponse) => { // Use 
             const { firstName, lastName, specialization, experience } = req.body;
             const updateFields: string[] = [];
             const updateValues: any[] = [];
+             let paramIndex = 1;
 
-            if (firstName !== undefined) { updateFields.push('first_name = ?'); updateValues.push(firstName); }
-            if (lastName !== undefined) { updateFields.push('last_name = ?'); updateValues.push(lastName); }
-            if (specialization !== undefined) { updateFields.push('specialization = ?'); updateValues.push(specialization); }
-            if (experience !== undefined) { updateFields.push('experience = ?'); updateValues.push(experience); }
+            if (firstName !== undefined) { updateFields.push(`first_name = $${paramIndex++}`); updateValues.push(firstName); }
+            if (lastName !== undefined) { updateFields.push(`last_name = $${paramIndex++}`); updateValues.push(lastName); }
+            if (specialization !== undefined) { updateFields.push(`specialization = $${paramIndex++}`); updateValues.push(specialization); }
+            if (experience !== undefined) { updateFields.push(`experience = $${paramIndex++}`); updateValues.push(experience); }
 
 
             if (updateFields.length === 0) {
@@ -60,13 +62,13 @@ export default authMiddleware(async (req: any, res: VercelResponse) => { // Use 
                 return;
             }
 
-            updateFields.push('updated_at = CURRENT_TIMESTAMP');
+            updateFields.push(`updated_at = CURRENT_TIMESTAMP`);
             updateValues.push(coachId); // Add coach ID for the WHERE clause
 
-            const sql = `UPDATE coaches SET ${updateFields.join(', ')} WHERE id = ?`;
-            const [result] = await connection.execute(sql, updateValues);
+            const sql = `UPDATE coaches SET ${updateFields.join(', ')} WHERE id = $${paramIndex}`;
+            const result = await client.query(sql, updateValues);
 
-            sendApiResponse(res, true, { affectedRows: (result as any).affectedRows }, undefined, 200);
+            sendApiResponse(res, true, { affectedRows: result.rowCount }, undefined, 200); // Use rowCount for affected rows
 
 
         } else if (req.method === 'DELETE') {
@@ -76,9 +78,9 @@ export default authMiddleware(async (req: any, res: VercelResponse) => { // Use 
                 return;
             }
 
-            const [result] = await connection.execute('DELETE FROM coaches WHERE id = ?', [coachId]);
+            const result = await client.query('DELETE FROM coaches WHERE id = $1', [coachId]);
 
-            sendApiResponse(res, true, { affectedRows: (result as any).affectedRows }, undefined, 200);
+            sendApiResponse(res, true, { affectedRows: result.rowCount }, undefined, 200); // Use rowCount for affected rows
 
         } else {
             sendApiResponse(res, false, undefined, 'Method Not Allowed', 405);
@@ -88,8 +90,9 @@ export default authMiddleware(async (req: any, res: VercelResponse) => { // Use 
         console.error('Coach endpoint error:', error);
         sendApiResponse(res, false, undefined, error instanceof Error ? error.message : 'Failed to process coach request', 500);
     } finally {
-        if (connection) {
-            connection.release();
+        if (client) {
+            client.release();
         }
     }
 }, ['admin', 'coach', 'player']); // Allow admin, coach, or player
+
