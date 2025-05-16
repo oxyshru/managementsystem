@@ -4,7 +4,7 @@ import { VercelRequest, VercelResponse } from '@vercel/node';
 import { getConnection } from './utils/db';
 import { sendApiResponse } from './utils/apiResponse';
 import { authMiddleware } from './utils/authMiddleware';
-import { User } from '@/types/database.types';
+import { User } from '../types/database.types'; // Changed import path
 import { PoolClient } from 'pg';
 
 // Wrap the handler with authMiddleware, requiring 'admin' role for GET
@@ -33,3 +33,4 @@ export default authMiddleware(async (req: VercelRequest & { user?: Omit<User, 'p
         }
     }
 }, ['admin']); // This endpoint requires 'admin' role
+
