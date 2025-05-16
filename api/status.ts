@@ -2,6 +2,7 @@
 import { VercelRequest, VercelResponse } from '@vercel/node';
 import { getConnection } from './utils/db'; // Corrected import path
 import { sendApiResponse } from './utils/apiResponse'; // Corrected import path
+import { PoolClient } from 'pg'; // Import PoolClient type
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   // Handle OPTIONS preflight requests
@@ -18,11 +19,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return;
   }
 
-  let connection;
+  let client: PoolClient | undefined; // Use PoolClient type
   try {
     // Attempt to get a connection to test the database
-    connection = await getConnection();
-    connection.release(); // Release immediately if successful
+    client = await getConnection();
+    client.release(); // Release immediately if successful
 
     sendApiResponse(res, true, { connected: true }, undefined, 200);
   } catch (error) {
@@ -30,3 +31,4 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     sendApiResponse(res, false, { connected: false }, 'Database connection failed', 500);
   }
 }
+
