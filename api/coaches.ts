@@ -3,7 +3,7 @@ import { VercelRequest, VercelResponse } from '@vercel/node';
 import { getConnection } from './utils/db';
 import { sendApiResponse } from './utils/apiResponse';
 import { authMiddleware } from './utils/authMiddleware';
-import { Coach, User } from '../types/database.types'; // Changed import path
+import { Coach, User } from '../src/types/database.types'; // Corrected import path
 import { PoolClient } from 'pg';
 
 // Wrap the handler with authMiddleware
