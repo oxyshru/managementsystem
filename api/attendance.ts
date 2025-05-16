@@ -3,7 +3,7 @@ import { VercelRequest, VercelResponse } from '@vercel/node';
 import { getConnection } from './utils/db';
 import { sendApiResponse } from './utils/apiResponse';
 import { authMiddleware } from './utils/authMiddleware';
-import { Attendance, User } from '../types/database.types'; // Changed import path
+import { Attendance, User } from '../../src/types/database.types'; // Changed import path
 import { PoolClient } from 'pg';
 
 // Wrap the handler with authMiddleware
@@ -96,7 +96,7 @@ export default authMiddleware(async (req: VercelRequest & { user?: Omit<User, 'p
                       if (req.query.playerId !== undefined) {
                           conditions.push(`player_id = $${paramIndex++}`);
                           values.push(req.query.playerId);
-                      }
+                     }
                 }
 
                 if (conditions.length > 0) {
@@ -133,7 +133,7 @@ export default authMiddleware(async (req: VercelRequest & { user?: Omit<User, 'p
 
         } else if (req.method === 'PUT') {
              // Handle PUT /api/attendance/:id
-             if (attendanceId === undefined) {
+             if (attendanceId === undefined) { // Corrected variable name
                   sendApiResponse(res, false, undefined, 'Attendance ID is required for PUT method', 400);
                   return;
              }
@@ -190,7 +190,7 @@ export default authMiddleware(async (req: VercelRequest & { user?: Omit<User, 'p
 
         } else if (req.method === 'DELETE') {
              // Handle DELETE /api/attendance/:id
-             if (attendanceId === undefined) {
+             if (attendanceId === undefined) { // Corrected variable name
                   sendApiResponse(res, false, undefined, 'Attendance ID is required for DELETE method', 400);
                   return;
              }
@@ -222,7 +222,7 @@ export default authMiddleware(async (req: VercelRequest & { user?: Omit<User, 'p
                  return;
              }
 
-            const result = await client.query('DELETE FROM session_attendance WHERE id = $1', [sessionId]);
+            const result = await client.query('DELETE FROM session_attendance WHERE id = $1', [attendanceId]);
 
             sendApiResponse(res, true, { affectedRows: result.rowCount }, undefined, 200);
 
