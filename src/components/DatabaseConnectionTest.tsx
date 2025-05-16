@@ -13,16 +13,16 @@ const DatabaseConnectionTest = () => {
   const testConnection = async () => {
     try {
       setStatus('loading');
-      setMessage('Testing connection to MySQL database...');
+      setMessage('Testing connection to PostgreSQL database...'); // Updated text
 
       const result = await dbService.testConnection();
 
       if (result.success && result.data?.connected) {
         setStatus('connected');
-        setMessage('Successfully connected to the MySQL database!');
+        setMessage('Successfully connected to the PostgreSQL database!'); // Updated text
         toast({
           title: 'Connection Successful',
-          description: 'Connected to MySQL database',
+          description: 'Connected to PostgreSQL database', // Updated text
           variant: 'default'
         });
       } else {
@@ -30,7 +30,7 @@ const DatabaseConnectionTest = () => {
         setMessage(`Connection failed: ${result.error}`);
         toast({
           title: 'Connection Failed',
-          description: result.error || 'Could not connect to MySQL database',
+          description: result.error || 'Could not connect to PostgreSQL database', // Updated text
           variant: 'destructive'
         });
       }
@@ -71,11 +71,11 @@ const DatabaseConnectionTest = () => {
         }
         </CardTitle>
         <CardDescription>
-          Test your MySQL database connection
+          Test your PostgreSQL database connection {/* Updated text */}
         </CardDescription>
       </CardHeader>
       <CardContent>
-        <p className="text-sm text-gray-500 dark:text-gray-400 mb-4" data-id="s1durlbgk" data-path="src/components/DatabaseConnectionTest.tsx">
+        <p className="text-sm text-gray-500 dark:text-gray-400 mb-4"> {/* data-id and data-path removed */}
           The database connection status will appear here after testing.
         </p>
         {message &&
@@ -85,7 +85,7 @@ const DatabaseConnectionTest = () => {
       status === 'error' ?
       'bg-red-50 text-red-800 dark:bg-red-950 dark:text-red-200' :
       'bg-blue-50 text-blue-800 dark:bg-blue-950 dark:text-blue-200'}`
-      } data-id="bdmlc0m3s" data-path="src/components/DatabaseConnectionTest.tsx">
+      }> {/* data-id and data-path removed */}
             {message}
           </div>
       }
