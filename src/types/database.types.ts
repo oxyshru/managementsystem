@@ -30,7 +30,7 @@ export interface Player { // Add export keyword
     createdAt: Date;
     updatedAt: Date;
     // Added for frontend mock data in dashboard, not necessarily in DB schema
-    sports?: string[];
+    sports?: string[]; // Assuming this is an array of game names
     attendance?: number; // Percentage
     lastAttendance?: 'Present' | 'Absent' | 'N/A';
     batch?: string; // Batch name
@@ -105,6 +105,20 @@ export interface Payment { // Add export keyword
     updatedAt: Date;
 }
 
+// Player Stats interface
+export interface PlayerStats { // Add export keyword
+    id: number;
+    player_id: number; // Use snake_case to match DB schema
+    games_played: number; // Use snake_case to match DB schema
+    goals_scored: number; // Use snake_case to match DB schema
+    assists: number; // Use snake_case to match DB schema
+    yellow_cards: number; // Use snake_case to match DB schema
+    red_cards: number; // Use snake_case to match DB schema
+    minutes_played: number; // Use snake_case to match DB schema
+    created_at: Date; // Use snake_case to match DB schema
+    updated_at: Date; // Use snake_case to match DB schema
+}
+
 // Performance Notes
 export interface PerformanceNote { // Add export keyword
     id: number;
@@ -116,39 +130,120 @@ export interface PerformanceNote { // Add export keyword
     updated_at: Date; // Use snake_case to match DB schema
 }
 
-// Define a separate type for seed data if it uses different formats (like string dates)
-// This type should reflect the *structure of the data being seeded*, not the final DB type.
-// The TS2739 error suggests the seed data structure in api/admin/reset-db.ts
-// is missing created_at and updated_at, but the PerformanceNoteSeed type
-// defined here *doesn't* include them due to Omit. Let's adjust the seed type
-// to match the *actual* structure being used in the seed data if necessary,
-// or adjust the seed data structure.
-// Based on the error, the seed data objects look like: { player_id: number; date: string; note: string; coach_id: number; }
-// The PerformanceNoteSeed type should match this if that's what's being assigned.
-// However, the SQL seed data *does* include created_at and updated_at.
-// Let's assume the seed data structure in api/admin/reset-db.ts *should* include
-// created_at and updated_at (as strings or Dates) to match the DB schema.
-// If the seed data structure in api/admin/reset-db.ts is correct as shown in the error,
-// then the PerformanceNoteSeed type needs to *not* omit created_at/updated_at,
-// which contradicts the purpose of a "seed" type that might not have these initially.
-// Let's revert PerformanceNoteSeed to match the DB schema for now and see if the error changes.
-// This seems more likely to align with the SQL seed data.
+// --- Seed Data Interfaces (to match the structure of the initialSeedData object literals) ---
+// These are specifically for the api/admin/reset-db.ts file.
+// They use snake_case for database column names and include 'id' where the seed data provides explicit IDs.
 
-// Reverted PerformanceNoteSeed to match the DB schema structure for seeding
-// (assuming the seed data in api/admin/reset-db.ts will provide these fields)
+export interface UserSeed { // Add export keyword
+    username: string;
+    email: string;
+    password?: string;
+    role: UserRole;
+    status: UserStatus;
+    // Seed data doesn't include created_at/updated_at initially for users
+}
+
+export interface PlayerSeed { // Add export keyword
+    userId: number;
+    firstName: string;
+    lastName: string;
+    position?: string;
+    dateOfBirth?: string; // Allow string for date in seed data
+    height?: number;
+    weight?: number;
+    sports?: string[]; // Assuming this is an array of game names in seed data
+    // Seed data doesn't include id, createdAt, updatedAt, stats, attendance, lastAttendance, batch
+}
+
+export interface CoachSeed { // Add export keyword
+    userId: number;
+    firstName: string;
+    lastName: string;
+    specialization?: string;
+    experience?: number;
+    // Seed data doesn't include id, createdAt, updatedAt
+}
+
+export interface GameSeed { // Add export keyword
+    name: string;
+    // Seed data doesn't include id, createdAt, updatedAt
+}
+
+export interface BatchSeed { // Add export keyword
+    id: number; // Seed data includes mock IDs for batches
+    gameId: number;
+    name: string;
+    schedule?: string;
+    coachId?: number;
+    // Seed data doesn't include createdAt, updatedAt
+}
+
+export interface TrainingSessionSeed { // Add export keyword
+    id: number; // Seed data includes mock IDs for training sessions
+    batchId: number;
+    title?: string;
+    description?: string;
+    date: string; // Allow string for date in seed data
+    duration: number;
+    location?: string;
+    // Seed data doesn't include createdAt, updatedAt
+}
+
+export interface AttendanceSeed { // Add export keyword
+    session_id: number; // Use snake_case to match seed data object literals
+    player_id: number; // Use snake_case to match seed data object literals
+    status: AttendanceStatus;
+    comments?: string;
+    created_at?: string; // Allow string for date in seed data
+    updated_at?: string; // Allow string for date in seed data
+    // Seed data doesn't include id
+}
+
+export interface PaymentSeed { // Add export keyword
+    id: number; // Seed data includes mock IDs for payments
+    player_id: number; // Use snake_case to match seed data object literals
+    date: string; // Allow string for date in seed data
+    amount: number;
+    description?: string;
+    // Seed data doesn't include createdAt, updatedAt
+}
+
 export interface PerformanceNoteSeed { // Add export keyword
-    player_id: number;
-    coach_id?: number;
-    date: string; // Allow string for seeding purposes
+    id: number; // Seed data includes mock IDs for performance notes
+    player_id: number; // Use snake_case to match seed data object literals
+    coach_id?: number; // Use snake_case to match seed data object literals
+    date: string; // Allow string for date in seed data
     note: string;
-    // Assuming seed data *will* provide these, even if the error message implies otherwise
-    created_at?: string; // Allow string for seeding
-    updated_at?: string; // Allow string for seeding
+    created_at?: string; // Allow string for date in seed data
+    updated_at?: string; // Allow string for date in seed data
+}
+
+export interface PlayerGameSeed { // Add export keyword
+    player_id: number; // Use snake_case to match seed data object literals
+    game_id: number; // Use snake_case to match seed data object literals
+}
+
+
+// Simulated database structure (Frontend simulation - not used with backend API)
+// This interface is primarily for the frontend's lib/db.service.ts mock data
+// and is not directly tied to the backend database type after the API migration.
+export interface SimulatedDatabase { // Add export keyword
+  users: User[];
+  players: Player[];
+  coaches: Coach[];
+  player_stats: PlayerStats[];
+  training_sessions: TrainingSession[];
+  attendance: Attendance[];
+  batches: Batch[];
+  payments: Payment[];
+  games: Game[];
+  // Use the actual PerformanceNote type here for consistency with frontend usage
+  performance_notes: PerformanceNote[];
 }
 
 
 // API response type
-export interface ApiResponse<T> {
+export interface ApiResponse<T> { // Add export keyword
   data?: T;
   error?: string;
   success: boolean;
