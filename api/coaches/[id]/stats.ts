@@ -1,9 +1,10 @@
 // api/players/[id]/stats.ts
 import { VercelRequest, VercelResponse } from '@vercel/node';
-import { getConnection } from '../../_utils/db';
-import { sendApiResponse } from '../../_utils/apiResponse';
-import { authMiddleware } from '../../_utils/authMiddleware';
-import { PlayerStats } from '@/types/database.types'; // Import PlayerStats type
+import { getConnection } from '../../utils/db'; // Corrected import path
+import { sendApiResponse } from '../../utils/apiResponse'; // Corrected import path
+import { authMiddleware } from '../../utils/authMiddleware'; // Corrected import path
+import { PlayerStats } from '@/types/database.types';
+import { PoolClient } from 'pg'; // Import PoolClient type
 
 // Wrap the handler with authMiddleware
 export default authMiddleware(async (req: any, res: VercelResponse) => { // Use 'any' for req to access req.user
@@ -19,13 +20,13 @@ export default authMiddleware(async (req: any, res: VercelResponse) => { // Use 
         return;
     }
 
-    let connection;
+    let client: PoolClient | undefined; // Use PoolClient type
     try {
-        connection = await getConnection();
+        client = await getConnection();
 
         // Check if the authenticated user is the player themselves, their coach, or an admin
-        const [playerRows] = await connection.execute('SELECT user_id FROM players WHERE id = ?', [playerId]);
-        const player = (playerRows as any)[0];
+        const playerResult = await client.query('SELECT user_id FROM players WHERE id = $1', [playerId]);
+        const player = playerResult.rows[0];
 
         if (!player) {
              sendApiResponse(res, false, undefined, 'Player not found', 404);
@@ -42,15 +43,15 @@ export default authMiddleware(async (req: any, res: VercelResponse) => { // Use 
 
 
         // Fetch player stats
-        const [rows] = await connection.execute('SELECT id, player_id, games_played, goals_scored, assists, yellow_cards, red_cards, minutes_played, created_at, updated_at FROM player_stats WHERE player_id = ?', [playerId]);
-        const stats = (rows as any)[0]; // Assuming one stats record per player
+        const result = await client.query('SELECT id, player_id, games_played, goals_scored, assists, yellow_cards, red_cards, minutes_played, created_at, updated_at FROM player_stats WHERE player_id = $1', [playerId]);
+        const stats = result.rows[0]; // Assuming one stats record per player
 
         if (stats) {
             sendApiResponse(res, true, stats as PlayerStats, undefined, 200);
         } else {
             // Return default stats if none found, as the frontend expects
              sendApiResponse(res, true, {
-                 id: 0, // Mock ID for frontend
+                 id: 0, // Mock ID for frontend (should ideally not be 0 if inserting)
                  playerId: playerId,
                  gamesPlayed: 0,
                  goalsScored: 0,
@@ -67,8 +68,9 @@ export default authMiddleware(async (req: any, res: VercelResponse) => { // Use 
         console.error('Get player stats error:', error);
         sendApiResponse(res, false, undefined, error instanceof Error ? error.message : 'Failed to fetch player stats', 500);
     } finally {
-        if (connection) {
-            connection.release();
+        if (client) {
+            client.release();
         }
     }
 }, ['admin', 'coach', 'player']); // Allow admin, coach, or player
+
