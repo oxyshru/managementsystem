@@ -1,9 +1,10 @@
 // api/auth/register.ts
 import { VercelRequest, VercelResponse } from '@vercel/node';
-import { getConnection } from '../utils/db'; // Corrected import path
-import { sendApiResponse } from '../utils/apiResponse'; // Corrected import path
-import { generateMockToken } from '../utils/authMiddleware'; // Corrected import path
-import { User, Player, Coach, Game } from '@/types/database.types'; // Import types
+import { getConnection } from '../utils/db';
+import { sendApiResponse } from '../utils/apiResponse';
+import { generateMockToken } from '../utils/authMiddleware';
+import { User, Player, Coach, Game } from '@/types/database.types';
+import { PoolClient } from 'pg'; // Import PoolClient type
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
     // Handle OPTIONS preflight requests
@@ -46,70 +47,81 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     // Coach specialization/experience are optional in this demo INSERT
 
 
-    let connection;
+    let client: PoolClient | undefined; // Use PoolClient type
     try {
-        connection = await getConnection();
+        client = await getConnection();
 
         // Check if user already exists
-        const [existingUsers] = await connection.execute('SELECT id FROM users WHERE email = ? OR username = ?', [email, username]);
-        if ((existingUsers as any).length > 0) {
+        const existingUsersResult = await client.query('SELECT id FROM users WHERE email = $1 OR username = $2', [email, username]);
+        if (existingUsersResult.rows.length > 0) {
             sendApiResponse(res, false, undefined, 'User with this email or username already exists', 409);
             return;
         }
 
         // Start a transaction
-        await connection.beginTransaction();
+        await client.query('BEGIN');
 
         // 1. Create User
         // In a real app, hash the password here
-        const [userResult] = await connection.execute(
-            'INSERT INTO users (username, email, password, role, status) VALUES (?, ?, ?, ?, ?)',
+        const userResult = await client.query(
+            'INSERT INTO users (username, email, password, role, status) VALUES ($1, $2, $3, $4, $5) RETURNING id, username, email, role, status, created_at, updated_at', // Use $n placeholders and RETURNING
             [username, email, password, role, 'active'] // Default status to active on registration
         );
-        const newUserId = (userResult as any).insertId;
+        const newUser = userResult.rows[0];
+        const newUserId = newUser.id;
 
         let newProfileId = null;
 
         // 2. Create Player or Coach Profile
         if (role === 'player') {
-             // Simplified Player creation - does NOT handle player_games linking here
-            const [playerResult] = await connection.execute(
-                'INSERT INTO players (user_id, first_name, last_name) VALUES (?, ?, ?)',
+             // Create Player profile
+            const playerResult = await client.query(
+                'INSERT INTO players (user_id, first_name, last_name) VALUES ($1, $2, $3) RETURNING id', // Use $n placeholders and RETURNING
                 [newUserId, firstName, lastName]
             );
-             newProfileId = (playerResult as any).insertId;
+             newProfileId = playerResult.rows[0].id;
 
-             // In a real app, you would now link the player to selected games in the player_games table
-             // based on the 'sports' array received in the payload.
-             // This requires fetching game IDs based on names and inserting into player_games.
-             // Skipping full implementation for demo simplicity.
-             console.warn("Linking player to sports is simplified in this demo backend.");
+             // Link the player to selected games in the player_games table
+             if (Array.isArray(sports) && sports.length > 0) {
+                 // Fetch game IDs based on names
+                 const gameNames = sports;
+                 const gameIdsResult = await client.query('SELECT id FROM games WHERE name = ANY($1)', [gameNames]);
+                 const gameIds = gameIdsResult.rows.map(row => row.id);
+
+                 // Insert into player_games table
+                 if (gameIds.length > 0) {
+                     const playerGamesValues = gameIds.map(gameId => `(${newProfileId}, ${gameId})`).join(',');
+                     await client.query(`INSERT INTO player_games (player_id, game_id) VALUES ${playerGamesValues}`);
+                 }
+             }
 
 
         } else if (role === 'coach') {
-            const [coachResult] = await connection.execute(
+            const coachResult = await client.query(
                  // Simplified Coach creation - specialization and experience are optional in this demo INSERT
-                'INSERT INTO coaches (user_id, first_name, last_name, specialization, experience) VALUES (?, ?, ?, ?, ?)',
+                'INSERT INTO coaches (user_id, first_name, last_name, specialization, experience) VALUES ($1, $2, $3, $4, $5) RETURNING id', // Use $n placeholders and RETURNING
                 [newUserId, firstName, lastName, specialization || null, experience || null]
             );
-             newProfileId = (coachResult as any).insertId;
+             newProfileId = coachResult.rows[0].id;
         }
         // Admin profiles are typically created manually in the database or via a separate admin tool,
         // not via this public registration endpoint.
 
         // Commit the transaction
-        await connection.commit();
+        await client.query('COMMIT');
 
-        // Fetch the newly created user to return (excluding password)
-        const [newUserRows] = await connection.execute('SELECT id, username, email, role, status, created_at, updated_at FROM users WHERE id = ?', [newUserId]);
-        const newUser = (newUserRows as any)[0];
-
-         // Generate a mock token for the new user
+        // Generate a mock token for the new user
          const token = generateMockToken(newUser);
 
-        // Return the new user data and token
+        // Return the new user data and token (excluding password)
         const newUserResponseData = {
-             ...newUser,
+             id: newUser.id,
+             username: newUser.username,
+             email: newUser.email,
+             role: newUser.role,
+             status: newUser.status,
+             createdAt: newUser.created_at,
+             updatedAt: newUser.updated_at,
              token: token, // Include the token
         };
 
@@ -117,14 +129,15 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         sendApiResponse(res, true, newUserResponseData, undefined, 201); // 201 Created
 
     } catch (error) {
-        if (connection) {
-            await connection.rollback(); // Rollback transaction on error
+        if (client) {
+            await client.query('ROLLBACK'); // Rollback transaction on error
         }
         console.error('Registration error:', error);
         sendApiResponse(res, false, undefined, error instanceof Error ? error.message : 'Registration failed', 500);
     } finally {
-        if (connection) {
-            connection.release();
+        if (client) {
+            client.release();
         }
     }
 }
+
