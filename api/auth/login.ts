@@ -1,8 +1,9 @@
 // api/auth/login.ts
 import { VercelRequest, VercelResponse } from '@vercel/node';
-import { getConnection } from '../utils/db'; // Corrected import path
-import { sendApiResponse } from '../utils/apiResponse'; // Corrected import path
-import { generateMockToken } from '../utils/authMiddleware'; // Corrected import path
+import { getConnection } from '../utils/db';
+import { sendApiResponse } from '../utils/apiResponse';
+import { generateMockToken } from '../utils/authMiddleware';
+import { PoolClient } from 'pg'; // Import PoolClient type
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
     // Handle OPTIONS preflight requests
@@ -26,15 +27,15 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         return;
     }
 
-    let connection;
+    let client: PoolClient | undefined; // Use PoolClient type
     try {
-        connection = await getConnection();
+        client = await getConnection();
 
         // In a real app, you would hash the password and compare
         // For this demo, we'll do a plain text password check (INSECURE!)
-        const [rows] = await connection.execute('SELECT id, username, email, role, status, created_at, updated_at FROM users WHERE email = ? AND password = ?', [email, password]);
+        const result = await client.query('SELECT id, username, email, role, status, created_at, updated_at FROM users WHERE email = $1 AND password = $2', [email, password]);
 
-        const user = (rows as any)[0];
+        const user = result.rows[0];
 
         if (!user) {
             sendApiResponse(res, false, undefined, 'Invalid email or password', 401);
@@ -52,6 +53,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         const token = generateMockToken(user);
 
         // Return user data (excluding password) and the token
+        // Ensure column names match the database schema (snake_case)
         const userData = {
             id: user.id,
             username: user.username,
@@ -70,8 +72,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         console.error('Login error:', error);
         sendApiResponse(res, false, undefined, error instanceof Error ? error.message : 'Login failed', 500);
     } finally {
-        if (connection) {
-            connection.release();
+        if (client) {
+            client.release();
         }
     }
 }
+
