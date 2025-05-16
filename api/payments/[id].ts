@@ -1,9 +1,10 @@
 // api/payments/[id].ts
 import { VercelRequest, VercelResponse } from '@vercel/node';
-import { getConnection } from '../utils/db'; // Corrected import path
-import { sendApiResponse } from '../utils/apiResponse'; // Corrected import path
-import { authMiddleware } from '../utils/authMiddleware'; // Corrected import path
-import { Payment } from '@/types/database.types'; // Import Payment type
+import { getConnection } from '../utils/db';
+import { sendApiResponse } from '../utils/apiResponse';
+import { authMiddleware } from '../utils/authMiddleware';
+import { Payment } from '@/types/database.types';
+import { PoolClient } from 'pg'; // Import PoolClient type
 
 // Wrap the handler with authMiddleware
 export default authMiddleware(async (req: any, res: VercelResponse) => { // Use 'any' for req to access req.user
@@ -14,13 +15,13 @@ export default authMiddleware(async (req: any, res: VercelResponse) => { // Use 
         return;
     }
 
-    let connection;
+    let client: PoolClient | undefined; // Use PoolClient type
     try {
-        connection = await getConnection();
+        client = await getConnection();
 
         // Fetch payment details
-        const [rows] = await connection.execute('SELECT id, player_id, date, amount, description, created_at, updated_at FROM payments WHERE id = ?', [paymentId]);
-        const payment = (rows as any)[0];
+        const result = await client.query('SELECT id, player_id, date, amount, description, created_at, updated_at FROM payments WHERE id = $1', [paymentId]);
+        const payment = result.rows[0];
 
         if (!payment) {
             sendApiResponse(res, false, undefined, 'Payment not found', 404);
@@ -31,8 +32,8 @@ export default authMiddleware(async (req: any, res: VercelResponse) => { // Use 
         // Allow the player whose payment it is (by checking player_id -> user_id) to get their payment
         if (req.user.role !== 'admin') {
              // Find the player ID for the current user
-             const [playerRows] = await connection.execute('SELECT id FROM players WHERE user_id = ?', [req.user.id]);
-             const player = (playerRows as any)[0];
+             const playerResult = await client.query('SELECT id FROM players WHERE user_id = $1', [req.user.id]);
+             const player = playerResult.rows[0];
 
              if (!player || player.id !== payment.player_id) {
                   sendApiResponse(res, false, undefined, 'Access Denied', 403);
@@ -59,11 +60,12 @@ export default authMiddleware(async (req: any, res: VercelResponse) => { // Use 
             const { playerId, date, amount, description } = req.body;
             const updateFields: string[] = [];
             const updateValues: any[] = [];
+             let paramIndex = 1;
 
-            if (playerId !== undefined) { updateFields.push('player_id = ?'); updateValues.push(playerId); }
-            if (date !== undefined) { updateFields.push('date = ?'); updateValues.push(date); }
-            if (amount !== undefined) { updateFields.push('amount = ?'); updateValues.push(amount); }
-            if (description !== undefined) { updateFields.push('description = ?'); updateValues.push(description); }
+            if (playerId !== undefined) { updateFields.push(`player_id = $${paramIndex++}`); updateValues.push(playerId); }
+            if (date !== undefined) { updateFields.push(`date = $${paramIndex++}`); updateValues.push(date); }
+            if (amount !== undefined) { updateFields.push(`amount = $${paramIndex++}`); updateValues.push(amount); }
+            if (description !== undefined) { updateFields.push(`description = $${paramIndex++}`); updateValues.push(description); }
 
 
             if (updateFields.length === 0) {
@@ -71,13 +73,13 @@ export default authMiddleware(async (req: any, res: VercelResponse) => { // Use 
                 return;
             }
 
-            updateFields.push('updated_at = CURRENT_TIMESTAMP');
+            updateFields.push(`updated_at = CURRENT_TIMESTAMP`);
             updateValues.push(paymentId); // Add payment ID for the WHERE clause
 
-            const sql = `UPDATE payments SET ${updateFields.join(', ')} WHERE id = ?`;
-            const [result] = await connection.execute(sql, updateValues);
+            const sql = `UPDATE payments SET ${updateFields.join(', ')} WHERE id = $${paramIndex}`;
+            const result = await client.query(sql, updateValues);
 
-            sendApiResponse(res, true, { affectedRows: (result as any).affectedRows }, undefined, 200);
+            sendApiResponse(res, true, { affectedRows: result.rowCount }, undefined, 200); // Use rowCount for affected rows
 
 
         } else if (req.method === 'DELETE') {
@@ -87,9 +89,9 @@ export default authMiddleware(async (req: any, res: VercelResponse) => { // Use 
                 return;
             }
 
-            const [result] = await connection.execute('DELETE FROM payments WHERE id = ?', [paymentId]);
+            const result = await client.query('DELETE FROM payments WHERE id = $1', [paymentId]);
 
-            sendApiResponse(res, true, { affectedRows: (result as any).affectedRows }, undefined, 200);
+            sendApiResponse(res, true, { affectedRows: result.rowCount }, undefined, 200); // Use rowCount for affected rows
 
         } else {
             sendApiResponse(res, false, undefined, 'Method Not Allowed', 405);
@@ -99,8 +101,9 @@ export default authMiddleware(async (req: any, res: VercelResponse) => { // Use 
         console.error('Payment endpoint error:', error);
         sendApiResponse(res, false, undefined, error instanceof Error ? error.message : 'Failed to process payment request', 500);
     } finally {
-        if (connection) {
-            connection.release();
+        if (client) {
+            client.release();
         }
     }
 }, ['admin', 'player']); // Allow admin (all methods), player (GET their own)
+
