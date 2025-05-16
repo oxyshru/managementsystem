@@ -3,7 +3,7 @@ import { VercelRequest, VercelResponse } from '@vercel/node';
 import { getConnection } from './utils/db';
 import { sendApiResponse } from './utils/apiResponse';
 import { authMiddleware } from './utils/authMiddleware';
-import { Attendance, User } from '../../src/types/database.types'; // Changed import path
+import { Attendance, User } from '../src/types/database.types'; // Corrected import path
 import { PoolClient } from 'pg';
 
 // Wrap the handler with authMiddleware
@@ -149,8 +149,8 @@ export default authMiddleware(async (req: VercelRequest & { user?: Omit<User, 'p
 
               let relatedCoachUserId = null;
               if (relatedInfo.coach_id !== null) {
-                  const coachUserResult = await client.query('SELECT user_id FROM coaches WHERE id = $1', [relatedInfo.coach_id]);
-                  relatedCoachUserId = coachUserResult.rows[0]?.user_id || null;
+                   const coachUserResult = await client.query('SELECT user_id FROM coaches WHERE id = $1', [relatedInfo.coach_id]);
+                   relatedCoachUserId = coachUserResult.rows[0]?.user_id || null;
               }
 
              if (req.user?.role !== 'admin' && (req.user?.role !== 'coach' || req.user.id !== relatedCoachUserId)) {
@@ -216,13 +216,13 @@ export default authMiddleware(async (req: VercelRequest & { user?: Omit<User, 'p
                  return;
              }
 
-             const dependentAttendanceResult = await client.query('SELECT session_id FROM session_attendance WHERE session_id = $1', [sessionId]);
+             const dependentAttendanceResult = await client.query('SELECT session_id FROM session_attendance WHERE session_id = $1', [attendanceId]); // Corrected variable name here too
              if (dependentAttendanceResult.rows.length > 0) {
                  sendApiResponse(res, false, undefined, 'Cannot delete session: It has associated attendance records.', 409);
                  return;
              }
 
-            const result = await client.query('DELETE FROM session_attendance WHERE id = $1', [attendanceId]);
+            const result = await client.query('DELETE FROM session_attendance WHERE id = $1', [attendanceId]); // Corrected variable name
 
             sendApiResponse(res, true, { affectedRows: result.rowCount }, undefined, 200);
 
