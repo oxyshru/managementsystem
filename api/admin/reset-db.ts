@@ -5,7 +5,7 @@ import { sendApiResponse } from '../utils/apiResponse';
 import { authMiddleware } from '../utils/authMiddleware';
 import { generateMockToken } from '../utils/authMiddleware'; // Corrected import path
 // Import necessary types
-import { User, Player, Coach, Game, Batch, Payment, TrainingSession, Attendance, PerformanceNote, PerformanceNoteSeed } from '../types/database.types'; // Changed import path
+import { User, Player, Coach, Game, Batch, Payment, TrainingSession, Attendance, PerformanceNote, PerformanceNoteSeed } from '../../src/types/database.types'; // Corrected import path
 import { PoolClient } from 'pg'; // Import PoolClient type
 
 // Define interfaces for the seed data structure (excluding auto-generated fields)
