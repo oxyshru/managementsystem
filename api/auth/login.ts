@@ -3,6 +3,7 @@ import { VercelRequest, VercelResponse } from '@vercel/node';
 import { getConnection } from '../utils/db';
 import { sendApiResponse } from '../utils/apiResponse';
 import { generateMockToken } from '../utils/authMiddleware';
+import { User } from '../../src/types/database.types'; // Corrected import path
 import { PoolClient } from 'pg'; // Import PoolClient type
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
@@ -77,4 +78,5 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         }
     }
 }
+
 
