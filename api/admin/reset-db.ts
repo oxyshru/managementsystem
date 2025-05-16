@@ -87,12 +87,12 @@ const initialSeedData: {
         { id: 5, playerId: 3, date: '2025-05-01', amount: 150.00, description: 'Monthly Fee' },
     ],
     performance_notes: [
-        // Corrected key from playerId to player_id
-        { player_id: 1, date: '2025-05-10', note: 'Significant improvement in backhand technique', coachId: 1 },
-        { player_id: 2, date: '2025-05-12', note: 'Good stamina during drills', coachId: 1 },
+        // Corrected keys from playerId to player_id and coachId to coach_id
+        { player_id: 1, date: '2025-05-10', note: 'Significant improvement in backhand technique', coach_id: 1 },
+        { player_id: 2, date: '2025-05-12', note: 'Good stamina during drills', coach_id: 1 },
         // Note 3 skipped
-        { player_id: 3, date: '2025-05-18', note: 'Strong performance in freestyle', coachId: 2 },
-        { player_id: 4, date: '2025-05-18', note: 'Improving dive technique', coachId: 2 },
+        { player_id: 3, date: '2025-05-18', note: 'Strong performance in freestyle', coach_id: 2 },
+        { player_id: 4, date: '2025-05-18', note: 'Improving dive technique', coach_id: 2 },
     ],
     player_games: [
         // Removed SQL comments
