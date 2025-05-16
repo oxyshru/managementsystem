@@ -1,3 +1,4 @@
+// tsconfig.json
 {
   "files": [],
   "references": [
@@ -15,8 +16,5 @@
     "allowJs": true,
     "noUnusedLocals": false,
     "strictNullChecks": false
-  },
-  "exclude": [ // Add this section
-    "api"
-  ]
-}
+  }
+ }
