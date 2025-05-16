@@ -1,13 +1,14 @@
 // api/admin/reset-db.ts
 import { VercelRequest, VercelResponse } from '@vercel/node';
-import { getConnection } from '../utils/db'; // Corrected import path
-import { sendApiResponse } from '../utils/apiResponse'; // Corrected import path
-import { authMiddleware } from '../utils/authMiddleware'; // Corrected import path
+import { getConnection } from '../utils/db';
+import { sendApiResponse } from '../utils/apiResponse';
+import { authMiddleware } from '../utils/authMiddleware';
 import { generateMockToken } from '../utils/authMiddleware'; // Corrected import path
 import { User } from '@/types/database.types'; // Import User type
-
+import { PoolClient } from 'pg'; // Import PoolClient type
 
 // Initial seed data (matches the frontend's localStorage data structure for simplicity)
+// Note: IDs here are for mock data consistency, actual DB IDs will be SERIAL generated.
 const initialSeedData: {
     users: Omit<User, 'createdAt' | 'updatedAt'>[];
     players: Omit<any, 'createdAt' | 'updatedAt'>[]; // Use any for simplified mock data
@@ -16,6 +17,9 @@ const initialSeedData: {
     batches: Omit<any, 'createdAt' | 'updatedAt'>[]; // Use any for simplified mock data
     payments: Omit<any, 'createdAt' | 'updatedAt'>[]; // Use any for simplified mock data
     performance_notes: Omit<any, 'createdAt' | 'updatedAt'>[]; // Use any for simplified mock data
+    player_games: Omit<any, 'createdAt' | 'updatedAt'>[]; // Added player_games
+    training_sessions: Omit<any, 'createdAt' | 'updatedAt'>[]; // Added training_sessions
+    attendance: Omit<any, 'createdAt' | 'updatedAt'>[]; // Added attendance
 } = {
     users: [
         { id: 1, username: 'admin', email: 'admin@example.com', password: 'password123', role: 'admin', status: 'active' },
@@ -26,12 +30,12 @@ const initialSeedData: {
         { id: 6, username: 'coach2', email: 'coach2@example.com', password: 'password123', role: 'coach', status: 'active' },
     ],
     players: [
-        { id: 1, userId: 3, firstName: 'John', lastName: 'Smith', position: 'Forward', dateOfBirth: '2002-05-15', height: 180.5, weight: 75.2, sports: 'Badminton', attendance: 85, lastAttendance: 'Present', batch: 'Morning Batch' },
-        { id: 2, userId: 4, firstName: 'Emily', lastName: 'Johnson', position: 'Midfielder', dateOfBirth: '2003-11-20', height: 165.0, weight: 58.0, sports: 'Badminton', attendance: 92, lastAttendance: 'Present', batch: 'Morning Batch' },
-        { id: 3, userId: 5, firstName: 'Michael', lastName: 'Brown', position: 'Defender', dateOfBirth: '2000-01-30', height: 190.0, weight: 85.5, sports: 'Swimming', attendance: 78, lastAttendance: 'Absent', batch: 'Evening Batch' },
-        { id: 4, userId: 6, firstName: 'Sarah', lastName: 'Davis', position: 'Goalkeeper', dateOfBirth: '2004-07-07', height: 170.0, weight: 62.0, sports: 'Swimming', attendance: 90, lastAttendance: 'Present', batch: 'Evening Batch' },
-        { id: 5, userId: 7, firstName: 'James', lastName: 'Wilson', position: 'Forward', dateOfBirth: '2001-03-22', height: 185.0, weight: 78.0, sports: 'Badminton', attendance: 75, lastAttendance: 'Present', batch: 'Morning Batch' },
-        { id: 6, userId: 8, firstName: 'Jessica', lastName: 'Martinez', position: 'Midfielder', dateOfBirth: '2003-09-10', height: 168.0, weight: 60.0, sports: 'Badminton', attendance: 82, lastAttendance: 'Absent', batch: 'Morning Batch' },
+        { id: 1, userId: 3, firstName: 'John', lastName: 'Smith', position: 'Forward', dateOfBirth: '2002-05-15', height: 180.5, weight: 75.2, sports: ['Badminton'] }, // Added sports for player
+        { id: 2, userId: 4, firstName: 'Emily', lastName: 'Johnson', position: 'Midfielder', dateOfBirth: '2003-11-20', height: 165.0, weight: 58.0, sports: ['Badminton'] }, // Added sports for player
+        { id: 3, userId: 5, firstName: 'Michael', lastName: 'Brown', position: 'Defender', dateOfBirth: '2000-01-30', height: 190.0, weight: 85.5, sports: ['Swimming'] }, // Added sports for player
+        { id: 4, userId: 6, firstName: 'Sarah', lastName: 'Davis', position: 'Goalkeeper', dateOfBirth: '2004-07-07', height: 170.0, weight: 62.0, sports: ['Swimming'] }, // Added sports for player
+        // Note: Players 5 and 6 from frontend mock are not seeded here to keep it simple.
+        // Their user accounts exist, but no player profile.
     ],
     coaches: [
         { id: 1, userId: 2, firstName: 'Alex', lastName: 'Johnson', specialization: 'Badminton', experience: 5 },
@@ -48,6 +52,11 @@ const initialSeedData: {
         { id: 1, gameId: 1, name: 'Morning Batch', schedule: 'Mon, Wed, Fri 9:00 AM', coachId: 1 },
         { id: 2, gameId: 2, name: 'Evening Batch', schedule: 'Tue, Thu 4:00 PM', coachId: 2 },
     ],
+     training_sessions: [
+         { id: 1, batchId: 1, title: 'Badminton Footwork', description: 'Drills focusing on court movement', date: '2025-05-17 09:00:00+00', duration: 90, location: 'Court 1' },
+         { id: 2, batchId: 1, title: 'Badminton Serve Practice', description: 'Improving serve accuracy and power', date: '2025-05-19 09:00:00+00', duration: 60, location: 'Court 1' },
+         { id: 3, batchId: 2, title: 'Swimming Technique', description: 'Freestyle stroke correction', date: '2025-05-18 16:00:00+00', duration: 90, location: 'Pool Lane 2' },
+     ],
     payments: [
         { id: 1, playerId: 1, date: '2025-04-15', amount: 150.00, description: 'Monthly Fee' },
         { id: 2, playerId: 1, date: '2025-05-15', amount: 150.00, description: 'Monthly Fee' },
@@ -58,169 +67,192 @@ const initialSeedData: {
     performance_notes: [
         { id: 1, playerId: 1, date: '2025-05-10', note: 'Significant improvement in backhand technique', coachId: 1 },
         { id: 2, playerId: 2, date: '2025-05-12', note: 'Good stamina during drills', coachId: 1 },
-        { id: 3, playerId: 5, date: '2025-05-11', note: 'Needs to work on court positioning', coachId: 1 },
+        // Note 3 for player 5 is not seeded as player 5 profile is not seeded
         { id: 4, playerId: 3, date: '2025-05-18', note: 'Strong performance in freestyle', coachId: 2 },
         { id: 5, playerId: 4, date: '2025-05-18', note: 'Improving dive technique', coachId: 2 },
     ],
-    // Attendance and Player_Games would need more complex seeding
-    attendance: [], // Skipping detailed attendance seeding for simplicity
+    player_games: [
+        { player_id: 1, game_id: 1 }, -- John Smith (player 1) -> Badminton (game 1)
+        { player_id: 2, game_id: 1 }, -- Emily Johnson (player 2) -> Badminton (game 1)
+        { player_id: 3, game_id: 2 }, -- Michael Brown (player 3) -> Swimming (game 2)
+        { player_id: 4, game_id: 2 }, -- Sarah Davis (player 4) -> Swimming (game 2)
+    ],
+     attendance: [
+         { session_id: 1, player_id: 1, status: 'present', created_at: '2025-05-17 09:30:00+00', updated_at: '2025-05-17 09:30:00+00' },
+         { session_id: 1, player_id: 2, status: 'present', created_at: '2025-05-17 09:31:00+00', updated_at: '2025-05-17 09:31:00+00' },
+         { session_id: 3, player_id: 3, status: 'present', created_at: '2025-05-18 16:10:00+00', updated_at: '2025-05-18 16:10:00+00' },
+     ]
 };
 
 
 // Helper to execute multiple SQL statements
-async function executeSqlStatements(connection: any, sql: string): Promise<void> {
-    const statements = sql.split(';').filter(statement => statement.trim() !== '');
-    for (const statement of statements) {
-        await connection.execute(statement);
-    }
+async function executeSqlStatements(client: PoolClient, sql: string): Promise<void> {
+    // PostgreSQL allows multiple statements in a single query string, but it's safer
+    // to execute them individually or use a transaction block.
+    // For simplicity here, we'll execute as a single query.
+     await client.query(sql);
 }
 
 
 // SQL to drop and recreate tables (matches utils/db.schema.sql structure)
+// Includes dropping and recreating ENUM types
 const resetSql = `
 -- Drop tables in reverse order of dependencies
-DROP TABLE IF EXISTS performance_notes;
-DROP TABLE IF EXISTS session_attendance;
-DROP TABLE IF EXISTS training_sessions;
-DROP TABLE IF EXISTS payments;
-DROP TABLE IF EXISTS batches;
-DROP TABLE IF EXISTS player_stats;
-DROP TABLE IF EXISTS player_games;
-DROP TABLE IF EXISTS players;
-DROP TABLE IF EXISTS coaches;
-DROP TABLE IF EXISTS games;
-DROP TABLE IF EXISTS users;
+DROP TABLE IF EXISTS performance_notes CASCADE;
+DROP TABLE IF EXISTS session_attendance CASCADE;
+DROP TABLE IF EXISTS training_sessions CASCADE;
+DROP TABLE IF EXISTS payments CASCADE;
+DROP TABLE IF EXISTS batches CASCADE;
+DROP TABLE IF EXISTS player_stats CASCADE;
+DROP TABLE IF EXISTS player_games CASCADE;
+DROP TABLE IF EXISTS players CASCADE;
+DROP TABLE IF EXISTS coaches CASCADE;
+DROP TABLE IF EXISTS games CASCADE;
+DROP TABLE IF EXISTS users CASCADE;
+
+-- Drop custom ENUM types if they exist
+DROP TYPE IF EXISTS user_role_enum;
+DROP TYPE IF EXISTS user_status_enum;
+DROP TYPE IF EXISTS attendance_status_enum;
+
+-- Recreate custom ENUM types for PostgreSQL
+CREATE TYPE user_role_enum AS ENUM('player', 'coach', 'admin');
+CREATE TYPE user_status_enum AS ENUM('active', 'inactive', 'suspended');
+CREATE TYPE attendance_status_enum AS ENUM('present', 'absent', 'excused');
 
 -- Recreate tables (copy-paste from utils/db.schema.sql, excluding comments and sample data)
 CREATE TABLE users (
-  id INT PRIMARY KEY AUTO_INCREMENT,
+  id SERIAL PRIMARY KEY,
   username VARCHAR(50) NOT NULL UNIQUE,
   email VARCHAR(100) NOT NULL UNIQUE,
   password VARCHAR(255) NOT NULL,
-  role ENUM('player', 'coach', 'admin') NOT NULL DEFAULT 'player',
-  status ENUM('active', 'inactive', 'suspended') NOT NULL DEFAULT 'active',
-  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+  role user_role_enum NOT NULL DEFAULT 'player',
+  status user_status_enum NOT NULL DEFAULT 'active',
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 
 CREATE TABLE games (
-  id INT PRIMARY KEY AUTO_INCREMENT,
+  id SERIAL PRIMARY KEY,
   name VARCHAR(100) NOT NULL UNIQUE,
-  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 
 CREATE TABLE players (
-  id INT PRIMARY KEY AUTO_INCREMENT,
-  user_id INT NOT NULL,
+  id SERIAL PRIMARY KEY,
+  user_id INTEGER NOT NULL UNIQUE,
   first_name VARCHAR(50) NOT NULL,
   last_name VARCHAR(50) NOT NULL,
   position VARCHAR(50),
   date_of_birth DATE,
   height DECIMAL(5,2),
   weight DECIMAL(5,2),
-  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
   FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
 );
 
 CREATE TABLE player_games (
-  player_id INT NOT NULL,
-  game_id INT NOT NULL,
+  player_id INTEGER NOT NULL,
+  game_id INTEGER NOT NULL,
   PRIMARY KEY (player_id, game_id),
   FOREIGN KEY (player_id) REFERENCES players(id) ON DELETE CASCADE,
   FOREIGN KEY (game_id) REFERENCES games(id) ON DELETE CASCADE
 );
 
 CREATE TABLE coaches (
-  id INT PRIMARY KEY AUTO_INCREMENT,
-  user_id INT NOT NULL,
+  id SERIAL PRIMARY KEY,
+  user_id INTEGER NOT NULL UNIQUE,
   first_name VARCHAR(50) NOT NULL,
   last_name VARCHAR(50) NOT NULL,
   specialization VARCHAR(100),
-  experience INT,
-  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  experience INTEGER,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
   FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
 );
 
 CREATE TABLE player_stats (
-  id INT PRIMARY KEY AUTO_INCREMENT,
-  player_id INT NOT NULL,
-  games_played INT DEFAULT 0,
-  goals_scored INT DEFAULT 0,
-  assists INT DEFAULT 0,
-  yellow_cards INT DEFAULT 0,
-  red_cards INT DEFAULT 0,
-  minutes_played INT DEFAULT 0,
-  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  id SERIAL PRIMARY KEY,
+  player_id INTEGER NOT NULL UNIQUE,
+  games_played INTEGER DEFAULT 0,
+  goals_scored INTEGER DEFAULT 0,
+  assists INTEGER DEFAULT 0,
+  yellow_cards INTEGER DEFAULT 0,
+  red_cards INTEGER DEFAULT 0,
+  minutes_played INTEGER DEFAULT 0,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
   FOREIGN KEY (player_id) REFERENCES players(id) ON DELETE CASCADE
 );
 
 CREATE TABLE batches (
-  id INT PRIMARY KEY AUTO_INCREMENT,
-  game_id INT NOT NULL,
+  id SERIAL PRIMARY KEY,
+  game_id INTEGER NOT NULL,
   name VARCHAR(100) NOT NULL,
   schedule VARCHAR(255),
-  coach_id INT,
-  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  coach_id INTEGER,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
   FOREIGN KEY (game_id) REFERENCES games(id) ON DELETE CASCADE,
   FOREIGN KEY (coach_id) REFERENCES coaches(id) ON DELETE SET NULL
 );
 
 CREATE TABLE training_sessions (
-  id INT PRIMARY KEY AUTO_INCREMENT,
-  batch_id INT NOT NULL,
+  id SERIAL PRIMARY KEY,
+  batch_id INTEGER NOT NULL,
   title VARCHAR(100),
   description TEXT,
-  date DATETIME NOT NULL,
-  duration INT NOT NULL,
+  date TIMESTAMP WITH TIME ZONE NOT NULL,
+  duration INTEGER NOT NULL,
   location VARCHAR(100),
-  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
   FOREIGN KEY (batch_id) REFERENCES batches(id) ON DELETE CASCADE
 );
 
 CREATE TABLE session_attendance (
-  session_id INT NOT NULL,
-  player_id INT NOT NULL,
-  status ENUM('present', 'absent', 'excused') NOT NULL DEFAULT 'absent',
+  session_id INTEGER NOT NULL,
+  player_id INTEGER NOT NULL,
+  status attendance_status_enum NOT NULL DEFAULT 'absent',
   comments TEXT,
-  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (session_id, player_id),
   FOREIGN KEY (session_id) REFERENCES training_sessions(id) ON DELETE CASCADE,
   FOREIGN KEY (player_id) REFERENCES players(id) ON DELETE CASCADE
 );
 
 CREATE TABLE payments (
-  id INT PRIMARY KEY AUTO_INCREMENT,
-  player_id INT NOT NULL,
+  id SERIAL PRIMARY KEY,
+  player_id INTEGER NOT NULL,
   date DATE NOT NULL,
   amount DECIMAL(10,2) NOT NULL,
   description VARCHAR(255),
-  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
   FOREIGN KEY (player_id) REFERENCES players(id) ON DELETE CASCADE
 );
 
 CREATE TABLE performance_notes (
-    id INT PRIMARY KEY AUTO_INCREMENT,
-    player_id INT NOT NULL,
-    coach_id INT,
+    id SERIAL PRIMARY KEY,
+    player_id INTEGER NOT NULL,
+    coach_id INTEGER,
     date DATE NOT NULL,
     note TEXT NOT NULL,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (player_id) REFERENCES players(id) ON DELETE CASCADE,
     FOREIGN KEY (coach_id) REFERENCES coaches(id) ON DELETE SET NULL
 );
 `;
 
 // SQL to insert seed data (simplified - assumes IDs match initialSeedData)
-// In a real app, you'd get generated IDs after inserts.
+// In a real app, you'd get generated IDs after inserts and use those for foreign keys.
+// For this demo, we'll insert and then link using the *mock* IDs, which is fragile
+// but simpler for a direct translation of the MySQL seed data structure.
+// A better approach would be to insert sequentially and use RETURNING id.
 const seedSql = `
 INSERT INTO users (id, username, email, password, role, status) VALUES
 (1, 'admin', 'admin@example.com', 'password123', 'admin', 'active'),
@@ -230,12 +262,19 @@ INSERT INTO users (id, username, email, password, role, status) VALUES
 (5, 'player3', 'player3@example.com', 'password123', 'player', 'active'),
 (6, 'coach2', 'coach2@example.com', 'password123', 'coach', 'active');
 
+-- Reset SERIAL sequences after inserting with explicit IDs
+SELECT setval('users_id_seq', (SELECT MAX(id) FROM users));
+
+
 INSERT INTO games (id, name) VALUES
 (1, 'Badminton'),
 (2, 'Swimming'),
 (3, 'Football'),
 (4, 'Basketball'),
 (5, 'Tennis');
+
+SELECT setval('games_id_seq', (SELECT MAX(id) FROM games));
+
 
 INSERT INTO players (id, user_id, first_name, last_name, position, date_of_birth, height, weight) VALUES
 (1, 3, 'John', 'Smith', 'Forward', '2002-05-15', 180.5, 75.2),
@@ -244,18 +283,30 @@ INSERT INTO players (id, user_id, first_name, last_name, position, date_of_birth
 (4, 6, 'Sarah', 'Davis', 'Goalkeeper', '2004-07-07', 170.0, 62.0);
 -- Note: Players 5 and 6 from frontend mock are not seeded here to keep it simple.
 
+SELECT setval('players_id_seq', (SELECT MAX(id) FROM players));
+
+
 INSERT INTO coaches (id, user_id, first_name, last_name, specialization, experience) VALUES
 (1, 2, 'Alex', 'Johnson', 'Badminton', 5),
 (2, 6, 'Sarah', 'Williams', 'Swimming', 8);
+
+SELECT setval('coaches_id_seq', (SELECT MAX(id) FROM coaches));
+
 
 INSERT INTO batches (id, game_id, name, schedule, coach_id) VALUES
 (1, 1, 'Morning Batch', 'Mon, Wed, Fri 9:00 AM', 1),
 (2, 2, 'Evening Batch', 'Tue, Thu 4:00 PM', 2);
 
+SELECT setval('batches_id_seq', (SELECT MAX(id) FROM batches));
+
+
 INSERT INTO training_sessions (id, batch_id, title, description, date, duration, location) VALUES
-(1, 1, 'Badminton Footwork', 'Drills focusing on court movement', '2025-05-17 09:00:00', 90, 'Court 1'),
-(2, 1, 'Badminton Serve Practice', 'Improving serve accuracy and power', '2025-05-19 09:00:00', 60, 'Court 1'),
-(3, 2, 'Swimming Technique', 'Freestyle stroke correction', '2025-05-18 16:00:00', 90, 'Pool Lane 2');
+(1, 1, 'Badminton Footwork', 'Drills focusing on court movement', '2025-05-17 09:00:00+00', 90, 'Court 1'),
+(2, 1, 'Badminton Serve Practice', 'Improving serve accuracy and power', '2025-05-19 09:00:00+00', 60, 'Court 1'),
+(3, 2, 'Swimming Technique', 'Freestyle stroke correction', '2025-05-18 16:00:00+00', 90, 'Pool Lane 2');
+
+SELECT setval('training_sessions_id_seq', (SELECT MAX(id) FROM training_sessions));
+
 
 INSERT INTO payments (id, player_id, date, amount, description) VALUES
 (1, 1, '2025-04-15', 150.00, 'Monthly Fee'),
@@ -264,12 +315,18 @@ INSERT INTO payments (id, player_id, date, amount, description) VALUES
 (4, 3, '2025-04-01', 200.00, 'Registration Fee'),
 (5, 3, '2025-05-01', 150.00, 'Monthly Fee');
 
+SELECT setval('payments_id_seq', (SELECT MAX(id) FROM payments));
+
+
 INSERT INTO performance_notes (id, player_id, coach_id, date, note) VALUES
 (1, 1, 1, '2025-05-10', 'Significant improvement in backhand technique'),
 (2, 2, 1, '2025-05-12', 'Good stamina during drills'),
-(3, 5, 1, '2025-05-11', 'Needs to work on court positioning'),
+-- Note 3 skipped
 (4, 3, 2, '2025-05-18', 'Strong performance in freestyle'),
 (5, 4, 2, '2025-05-18', 'Improving dive technique');
+
+SELECT setval('performance_notes_id_seq', (SELECT MAX(id) FROM performance_notes));
+
 
 -- Link players to games (example based on frontend mock)
 INSERT INTO player_games (player_id, game_id) VALUES
@@ -280,10 +337,9 @@ INSERT INTO player_games (player_id, game_id) VALUES
 
 -- Add some mock attendance records (simplified)
 INSERT INTO session_attendance (session_id, player_id, status, created_at, updated_at) VALUES
-(1, 1, 'present', '2025-05-17 09:30:00', '2025-05-17 09:30:00'),
-(1, 2, 'present', '2025-05-17 09:31:00', '2025-05-17 09:31:00'),
-(3, 3, 'present', '2025-05-18 16:10:00', '2025-05-18 16:10:00');
-
+(1, 1, 'present', '2025-05-17 09:30:00+00', '2025-05-17 09:30:00+00'),
+(1, 2, 'present', '2025-05-17 09:31:00+00', '2025-05-17 09:31:00+00'),
+(3, 3, 'present', '2025-05-18 16:10:00+00', '2025-05-18 16:10:00+00');
 `;
 
 
@@ -301,33 +357,34 @@ export default authMiddleware(async (req, res) => {
     }
 
 
-    let connection;
+    let client;
     try {
-        connection = await getConnection();
+        client = await getConnection();
 
         // Start a transaction
-        await connection.beginTransaction();
+        await client.query('BEGIN');
 
         // Execute the reset SQL
-        await executeSqlStatements(connection, resetSql);
+        await executeSqlStatements(client, resetSql);
 
         // Execute the seed SQL
-        await executeSqlStatements(connection, seedSql);
+        await executeSqlStatements(client, seedSql);
 
         // Commit the transaction
-        await connection.commit();
+        await client.query('COMMIT');
 
         sendApiResponse(res, true, undefined, 'Database reset and seeded successfully', 200);
 
     } catch (error) {
-        if (connection) {
-            await connection.rollback(); // Rollback transaction on error
+        if (client) {
+            await client.query('ROLLBACK'); // Rollback transaction on error
         }
         console.error('Database reset failed:', error);
         sendApiResponse(res, false, undefined, error instanceof Error ? error.message : 'Failed to reset database', 500);
     } finally {
-        if (connection) {
-            connection.release();
+        if (client) {
+            client.release();
         }
     }
 }, ['admin']); // Ensure only users with the 'admin' role can access this endpoint
+
