@@ -3,7 +3,7 @@ import { VercelRequest, VercelResponse } from '@vercel/node';
 import { getConnection } from '../utils/db';
 import { sendApiResponse } from '../utils/apiResponse';
 import { generateMockToken } from '../utils/authMiddleware';
-import { User, Player, Coach, Game } from '@/types/database.types';
+import { User, Player, Coach, Game } from '../types/database.types'; // Changed import path
 import { PoolClient } from 'pg'; // Import PoolClient type
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
@@ -140,4 +140,5 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         }
     }
 }
+
 
