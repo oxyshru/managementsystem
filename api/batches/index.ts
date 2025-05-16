@@ -1,22 +1,23 @@
 // api/batches/index.ts
 import { VercelRequest, VercelResponse } from '@vercel/node';
-import { getConnection } from '../utils/db'; // Corrected import path
-import { sendApiResponse } from '../utils/apiResponse'; // Corrected import path
-import { authMiddleware } from '../utils/authMiddleware'; // Corrected import path
-import { Batch } from '@/types/database.types'; // Import Batch type
+import { getConnection } from '../utils/db';
+import { sendApiResponse } from '../utils/apiResponse';
+import { authMiddleware } from '../utils/authMiddleware';
+import { Batch } from '@/types/database.types';
+import { PoolClient } from 'pg'; // Import PoolClient type
 
 // Wrap the handler with authMiddleware
 export default authMiddleware(async (req: any, res: VercelResponse) => { // Use 'any' for req to access req.user
-    let connection;
+    let client: PoolClient | undefined; // Use PoolClient type
     try {
-        connection = await getConnection();
+        client = await getConnection();
 
         if (req.method === 'GET') {
             // Allow any authenticated user to get the list of batches
             // Coaches might want their own batches, players might want batches for their sports
             // For simplicity, return all batches for now. Filtering can be added via query params.
-            const [rows] = await connection.execute('SELECT id, game_id, name, schedule, coach_id, created_at, updated_at FROM batches');
-            sendApiResponse(res, true, rows as Batch[], undefined, 200);
+            const result = await client.query('SELECT id, game_id, name, schedule, coach_id, created_at, updated_at FROM batches');
+            sendApiResponse(res, true, result.rows as Batch[], undefined, 200);
 
         } else if (req.method === 'POST') {
             // Only allow admin to add new batches
@@ -36,18 +37,18 @@ export default authMiddleware(async (req: any, res: VercelResponse) => { // Use 
              // Skipping validation for demo simplicity
 
 
-            const [result] = await connection.execute(
-                'INSERT INTO batches (game_id, name, schedule, coach_id) VALUES (?, ?, ?, ?)',
+            const result = await client.query(
+                'INSERT INTO batches (game_id, name, schedule, coach_id) VALUES ($1, $2, $3, $4) RETURNING id', // Use $n placeholders and RETURNING
                 [gameId, name, schedule, coachId || null] // coachId can be null
             );
-            const newBatchId = (result as any).insertId;
+            const newBatchId = result.rows[0].id; // Get the inserted ID
 
-             // Fetch the newly created batch to return its ID
-             const [newBatchRows] = await connection.execute('SELECT id FROM batches WHERE id = ?', [newBatchId]);
-             const newBatch = (newBatchRows as any)[0];
+             // Fetch the newly created batch to return its ID (optional, can just return the ID)
+             // const newBatchResult = await client.query('SELECT id FROM batches WHERE id = $1', [newBatchId]);
+             // const newBatch = newBatchResult.rows[0];
 
 
-            sendApiResponse(res, true, { id: newBatch.id }, undefined, 201); // 201 Created
+            sendApiResponse(res, true, { id: newBatchId }, undefined, 201); // 201 Created
 
         } else {
             sendApiResponse(res, false, undefined, 'Method Not Allowed', 405);
@@ -57,8 +58,9 @@ export default authMiddleware(async (req: any, res: VercelResponse) => { // Use 
         console.error('Batches endpoint error:', error);
         sendApiResponse(res, false, undefined, error instanceof Error ? error.message : 'Failed to process batches request', 500);
     } finally {
-        if (connection) {
-            connection.release();
+        if (client) {
+            client.release();
         }
     }
 }, ['admin', 'coach', 'player']); // Allow admin, coach, or player to view; only admin to add
+
