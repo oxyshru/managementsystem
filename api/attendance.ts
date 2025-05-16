@@ -216,12 +216,7 @@ export default authMiddleware(async (req: VercelRequest & { user?: Omit<User, 'p
                  return;
              }
 
-             const dependentAttendanceResult = await client.query('SELECT session_id FROM session_attendance WHERE session_id = $1', [attendanceId]); // Corrected variable name here too
-             if (dependentAttendanceResult.rows.length > 0) {
-                 sendApiResponse(res, false, undefined, 'Cannot delete session: It has associated attendance records.', 409);
-                 return;
-             }
-
+             // No dependent records for attendance, can delete directly
             const result = await client.query('DELETE FROM session_attendance WHERE id = $1', [attendanceId]); // Corrected variable name
 
             sendApiResponse(res, true, { affectedRows: result.rowCount }, undefined, 200);
