@@ -8,11 +8,17 @@ export interface PerformanceNote { // Add export keyword
     id: number;
     player_id: number; // Use snake_case to match DB schema
     coach_id?: number; // Use snake_case to match DB schema
-    date: Date;
+    date: Date; // This is the type for the actual DB model/fetched data
     note: string;
     created_at: Date; // Use snake_case to match DB schema
     updated_at: Date; // Use snake_case to match DB schema
 }
+
+// Define a separate type for seed data if it uses different formats (like string dates)
+export interface PerformanceNoteSeed extends Omit<PerformanceNote, 'id' | 'createdAt' | 'updatedAt' | 'date'> {
+    date: string; // Allow string for seeding purposes
+}
+
 
 // ... other interfaces and the SimulatedDatabase interface
 
@@ -29,7 +35,8 @@ export interface SimulatedDatabase {
   batches: Batch[];
   payments: Payment[];
   games: Game[];
-  performance_notes: PerformanceNote[]; // Add PerformanceNote here too
+  // Use the actual PerformanceNote type here for consistency with frontend usage
+  performance_notes: PerformanceNote[];
 }
 
 
