@@ -1,7 +1,7 @@
-// api/status.ts
+// api/auth/status.ts
 import { VercelRequest, VercelResponse } from '@vercel/node';
-import { getConnection } from './utils/db'; // Corrected import path
-import { sendApiResponse } from './utils/apiResponse'; // Corrected import path
+import { getConnection } from '../utils/db'; // Corrected import path
+import { sendApiResponse } from '../utils/apiResponse'; // Corrected import path
 import { PoolClient } from 'pg'; // Import PoolClient type
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
@@ -31,4 +31,5 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     sendApiResponse(res, false, { connected: false }, 'Database connection failed', 500);
   }
 }
+
 
