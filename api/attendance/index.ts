@@ -1,15 +1,16 @@
 // api/attendance/index.ts
 import { VercelRequest, VercelResponse } from '@vercel/node';
-import { getConnection } from '../utils/db'; // Corrected import path
-import { sendApiResponse } from '../utils/apiResponse'; // Corrected import path
-import { authMiddleware } from '../utils/authMiddleware'; // Corrected import path
-import { Attendance } from '@/types/database.types'; // Import Attendance type
+import { getConnection } from '../utils/db';
+import { sendApiResponse } from '../utils/apiResponse';
+import { authMiddleware } from '../utils/authMiddleware';
+import { Attendance } from '@/types/database.types';
+import { PoolClient } from 'pg'; // Import PoolClient type
 
 // Wrap the handler with authMiddleware
 export default authMiddleware(async (req: any, res: VercelResponse) => { // Use 'any' for req to access req.user
-    let connection;
+    let client: PoolClient | undefined; // Use PoolClient type
     try {
-        connection = await getConnection();
+        client = await getConnection();
 
         if (req.method === 'GET') {
             // Allow admin to get all attendance
@@ -19,28 +20,29 @@ export default authMiddleware(async (req: any, res: VercelResponse) => { // Use 
             let sql = 'SELECT id, session_id, player_id, status, comments, created_at, updated_at FROM session_attendance';
             const values: any[] = [];
             const conditions: string[] = [];
+            let paramIndex = 1; // Start index for PostgreSQL placeholders
 
             if (req.user.role === 'player') {
                  // Find the player ID for the current user
-                 const [playerRows] = await connection.execute('SELECT id FROM players WHERE user_id = ?', [req.user.id]);
-                 const player = (playerRows as any)[0];
+                 const playerResult = await client.query('SELECT id FROM players WHERE user_id = $1', [req.user.id]);
+                 const player = playerResult.rows[0];
 
                  if (!player) {
                       sendApiResponse(res, false, undefined, 'Player profile not found', 404);
                       return;
                  }
 
-                 conditions.push('player_id = ?');
+                 conditions.push(`player_id = $${paramIndex++}`);
                  values.push(player.id);
 
             } else if (req.user.role === 'coach') {
                  // Find the coach ID for the current user
-                 const [coachRows] = await connection.execute('SELECT id FROM coaches WHERE user_id = ?', [req.user.id]);
-                 const coach = (coachRows as any)[0];
+                 const coachResult = await client.query('SELECT id FROM coaches WHERE user_id = $1', [req.user.id]);
+                 const coach = coachResult.rows[0];
 
                  if (coach) {
                      // Get attendance for sessions associated with this coach's batches
-                     conditions.push('session_id IN (SELECT ts.id FROM training_sessions ts JOIN batches b ON ts.batch_id = b.id WHERE b.coach_id = ?)');
+                     conditions.push(`session_id IN (SELECT ts.id FROM training_sessions ts JOIN batches b ON ts.batch_id = b.id WHERE b.coach_id = $${paramIndex++})`);
                      values.push(coach.id);
                  } else {
                      // Coach profile not found, return empty list
@@ -56,11 +58,11 @@ export default authMiddleware(async (req: any, res: VercelResponse) => { // Use 
              // Allow filtering by session_id or player_id if provided (for admin/coach)
              if (req.user.role !== 'player') { // Players are already filtered by their own ID
                   if (req.query.sessionId !== undefined) {
-                       conditions.push('session_id = ?');
+                       conditions.push(`session_id = $${paramIndex++}`);
                        values.push(req.query.sessionId);
                   }
                    if (req.query.playerId !== undefined) {
-                       conditions.push('player_id = ?');
+                       conditions.push(`player_id = $${paramIndex++}`);
                        values.push(req.query.playerId);
                    }
              }
@@ -74,8 +76,8 @@ export default authMiddleware(async (req: any, res: VercelResponse) => { // Use 
             sql += ' ORDER BY created_at DESC';
 
 
-            const [rows] = await connection.execute(sql, values);
-            sendApiResponse(res, true, rows as Attendance[], undefined, 200);
+            const result = await client.query(sql, values);
+            sendApiResponse(res, true, result.rows as Attendance[], undefined, 200);
 
         } else if (req.method === 'POST') {
             // Allow admin or coaches to record attendance
@@ -95,18 +97,18 @@ export default authMiddleware(async (req: any, res: VercelResponse) => { // Use 
              // Skipping validation for demo simplicity
 
 
-            const [result] = await connection.execute(
-                'INSERT INTO session_attendance (session_id, player_id, status, comments) VALUES (?, ?, ?, ?)',
+            const result = await client.query(
+                'INSERT INTO session_attendance (session_id, player_id, status, comments) VALUES ($1, $2, $3, $4) RETURNING id', // Use $n placeholders and RETURNING id
                 [sessionId, playerId, status, comments || null]
             );
-            const newAttendanceId = (result as any).insertId;
+            const newAttendanceId = result.rows[0].id; // Get the inserted ID
 
-             // Fetch the newly created attendance record to return its ID
-             const [newAttendanceRows] = await connection.execute('SELECT id FROM session_attendance WHERE id = ?', [newAttendanceId]);
-             const newAttendance = (newAttendanceRows as any)[0];
+             // Fetch the newly created attendance record to return its ID (optional, can just return the ID)
+             // const newAttendanceResult = await client.query('SELECT id FROM session_attendance WHERE id = $1', [newAttendanceId]);
+             // const newAttendance = newAttendanceResult.rows[0];
 
 
-            sendApiResponse(res, true, { id: newAttendance.id }, undefined, 201); // 201 Created
+            sendApiResponse(res, true, { id: newAttendanceId }, undefined, 201); // 201 Created
 
         } else {
             sendApiResponse(res, false, undefined, 'Method Not Allowed', 405);
@@ -116,8 +118,9 @@ export default authMiddleware(async (req: any, res: VercelResponse) => { // Use 
         console.error('Attendance endpoint error:', error);
         sendApiResponse(res, false, undefined, error instanceof Error ? error.message : 'Failed to process attendance request', 500);
     } finally {
-        if (connection) {
-            connection.release();
+        if (client) {
+            client.release();
         }
     }
 }, ['admin', 'coach', 'player']); // Allow admin, coach (GET/POST), player (GET their own)
+
