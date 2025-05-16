@@ -5,17 +5,17 @@ import { getConnection } from './utils/db';
 import { sendApiResponse } from './utils/apiResponse';
 import { authMiddleware } from './utils/authMiddleware';
 import { User } from '@/types/database.types';
-import { PoolClient } from 'pg'; // Import PoolClient type
+import { PoolClient } from 'pg';
 
 // Wrap the handler with authMiddleware, requiring 'admin' role for GET
-export default authMiddleware(async (req: any, res: VercelResponse) => { // Use 'any' for req to access req.user
+export default authMiddleware(async (req: VercelRequest & { user?: Omit<User, 'password'> }, res: VercelResponse) => {
     if (req.method !== 'GET') {
         sendApiResponse(res, false, undefined, 'Method Not Allowed', 405);
         return;
     }
 
     // The authMiddleware already checked for admin role, so we can proceed
-    let client: PoolClient | undefined; // Use PoolClient type
+    let client: PoolClient | undefined;
     try {
         client = await getConnection();
 
@@ -33,4 +33,3 @@ export default authMiddleware(async (req: any, res: VercelResponse) => { // Use 
         }
     }
 }, ['admin']); // This endpoint requires 'admin' role
-
