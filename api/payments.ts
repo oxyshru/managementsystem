@@ -3,7 +3,7 @@ import { VercelRequest, VercelResponse } from '@vercel/node';
 import { getConnection } from './utils/db';
 import { sendApiResponse } from './utils/apiResponse';
 import { authMiddleware } from './utils/authMiddleware';
-import { Payment, User } from '../src/types/database.types'; // Corrected import path
+import { Payment, User } from '../src/types/database.types';
 import { PoolClient } from 'pg';
 
 // Wrap the handler with authMiddleware
@@ -37,7 +37,18 @@ export default authMiddleware(async (req: VercelRequest & { user?: Omit<User, 'p
                      }
                 }
 
-                sendApiResponse(res, true, payment as Payment, undefined, 200);
+                 // Transform snake_case from DB to camelCase for frontend
+                const transformedPayment: Payment = {
+                    id: payment.id,
+                    playerId: payment.player_id,   // Transform
+                    date: payment.date,
+                    amount: payment.amount,
+                    description: payment.description,
+                    createdAt: payment.created_at, // Transform
+                    updatedAt: payment.updated_at, // Transform
+                };
+
+                sendApiResponse(res, true, transformedPayment, undefined, 200);
 
             } else {
                 // Handle GET /api/payments
@@ -82,7 +93,19 @@ export default authMiddleware(async (req: VercelRequest & { user?: Omit<User, 'p
                 sql += ' ORDER BY created_at DESC';
 
                 const result = await client.query(sql, values);
-                sendApiResponse(res, true, result.rows as Payment[], undefined, 200);
+
+                 // Transform snake_case from DB to camelCase for frontend
+                const transformedPayments: Payment[] = result.rows.map(row => ({
+                    id: row.id,
+                    playerId: row.player_id,   // Transform
+                    date: row.date,
+                    amount: row.amount,
+                    description: row.description,
+                    createdAt: row.created_at, // Transform
+                    updatedAt: row.updated_at, // Transform
+                }));
+
+                sendApiResponse(res, true, transformedPayments, undefined, 200);
             }
 
         } else if (req.method === 'POST') {
