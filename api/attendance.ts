@@ -3,7 +3,7 @@ import { VercelRequest, VercelResponse } from '@vercel/node';
 import { getConnection } from './utils/db';
 import { sendApiResponse } from './utils/apiResponse';
 import { authMiddleware } from './utils/authMiddleware';
-import { Attendance, User } from '../src/types/database.types'; // Corrected import path
+import { Attendance, User } from '../src/types/database.types';
 import { PoolClient } from 'pg';
 
 // Wrap the handler with authMiddleware
@@ -51,7 +51,18 @@ export default authMiddleware(async (req: VercelRequest & { user?: Omit<User, 'p
                      return;
                 }
 
-                sendApiResponse(res, true, attendance as Attendance, undefined, 200);
+                // Transform snake_case from DB to camelCase for frontend
+                const transformedAttendance: Attendance = {
+                    id: attendance.id,
+                    sessionId: attendance.session_id, // Transform
+                    playerId: attendance.player_id,   // Transform
+                    status: attendance.status,
+                    comments: attendance.comments,
+                    createdAt: attendance.created_at, // Transform
+                    updatedAt: attendance.updated_at, // Transform
+                };
+
+                sendApiResponse(res, true, transformedAttendance, undefined, 200);
 
             } else {
                 // Handle GET /api/attendance
@@ -106,7 +117,19 @@ export default authMiddleware(async (req: VercelRequest & { user?: Omit<User, 'p
                 sql += ' ORDER BY created_at DESC';
 
                 const result = await client.query(sql, values);
-                sendApiResponse(res, true, result.rows as Attendance[], undefined, 200);
+
+                 // Transform snake_case from DB to camelCase for frontend
+                const transformedAttendanceList: Attendance[] = result.rows.map(row => ({
+                    id: row.id,
+                    sessionId: row.session_id, // Transform
+                    playerId: row.player_id,   // Transform
+                    status: row.status,
+                    comments: row.comments,
+                    createdAt: row.created_at, // Transform
+                    updatedAt: row.updated_at, // Transform
+                }));
+
+                sendApiResponse(res, true, transformedAttendanceList, undefined, 200);
             }
 
         } else if (req.method === 'POST') {
@@ -133,7 +156,7 @@ export default authMiddleware(async (req: VercelRequest & { user?: Omit<User, 'p
 
         } else if (req.method === 'PUT') {
              // Handle PUT /api/attendance/:id
-             if (attendanceId === undefined) { // Corrected variable name
+             if (attendanceId === undefined) {
                   sendApiResponse(res, false, undefined, 'Attendance ID is required for PUT method', 400);
                   return;
              }
@@ -190,7 +213,7 @@ export default authMiddleware(async (req: VercelRequest & { user?: Omit<User, 'p
 
         } else if (req.method === 'DELETE') {
              // Handle DELETE /api/attendance/:id
-             if (attendanceId === undefined) { // Corrected variable name
+             if (attendanceId === undefined) {
                   sendApiResponse(res, false, undefined, 'Attendance ID is required for DELETE method', 400);
                   return;
              }
@@ -217,7 +240,7 @@ export default authMiddleware(async (req: VercelRequest & { user?: Omit<User, 'p
              }
 
              // No dependent records for attendance, can delete directly
-            const result = await client.query('DELETE FROM session_attendance WHERE id = $1', [attendanceId]); // Corrected variable name
+            const result = await client.query('DELETE FROM session_attendance WHERE id = $1', [attendanceId]);
 
             sendApiResponse(res, true, { affectedRows: result.rowCount }, undefined, 200);
 
