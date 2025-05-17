@@ -3,8 +3,8 @@ import { VercelRequest, VercelResponse } from '@vercel/node';
 import { getConnection } from '../utils/db';
 import { sendApiResponse } from '../utils/apiResponse';
 import { generateMockToken } from '../utils/authMiddleware';
-import { User } from '../../src/types/database.types'; // Corrected import path
-import { PoolClient } from 'pg'; // Import PoolClient type
+import { User } from '../../src/types/database.types';
+import { PoolClient } from 'pg';
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
     // Handle OPTIONS preflight requests
@@ -28,7 +28,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         return;
     }
 
-    let client: PoolClient | undefined; // Use PoolClient type
+    let client: PoolClient | undefined;
     try {
         client = await getConnection();
 
@@ -54,16 +54,16 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         const token = generateMockToken(user);
 
         // Return user data (excluding password) and the token
-        // Ensure column names match the database schema (snake_case)
-        const userData = {
+        // Transform snake_case from DB to camelCase for frontend
+        const userData: Omit<User, 'password'> & { token: string } = {
             id: user.id,
             username: user.username,
             email: user.email,
             role: user.role,
             status: user.status,
-            createdAt: user.created_at,
-            updatedAt: user.updated_at,
-            token: token, // Include the token in the response
+            createdAt: user.created_at, // Transform
+            updatedAt: user.updated_at, // Transform
+            token: token,
         };
 
 
@@ -78,5 +78,4 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         }
     }
 }
-
 
