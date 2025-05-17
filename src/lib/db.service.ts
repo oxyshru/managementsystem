@@ -156,7 +156,7 @@ class DbService {
   async testConnection(): Promise<ApiResponse<{ connected: boolean; }>> {
           // Calls the backend's /api/status endpoint
           // Explicitly call the /status endpoint relative to the API base path
-          return callApi<{ connected: boolean }>('/status');
+          return callApi<{ connected: boolean }>('/auth/status');
   }
 
   // The resetDatabase function would also need to call a backend endpoint
