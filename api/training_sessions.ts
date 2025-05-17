@@ -3,7 +3,7 @@ import { VercelRequest, VercelResponse } from '@vercel/node';
 import { getConnection } from './utils/db';
 import { sendApiResponse } from './utils/apiResponse';
 import { authMiddleware } from './utils/authMiddleware';
-import { TrainingSession, User } from '../src/types/database.types'; // Corrected import path
+import { TrainingSession, User } from '../src/types/database.types';
 import { PoolClient } from 'pg';
 
 // Wrap the handler with authMiddleware
@@ -50,7 +50,20 @@ export default authMiddleware(async (req: VercelRequest & { user?: Omit<User, 'p
                      return;
                 }
 
-                sendApiResponse(res, true, session as TrainingSession, undefined, 200);
+                // Transform snake_case from DB to camelCase for frontend
+                const transformedSession: TrainingSession = {
+                    id: session.id,
+                    batchId: session.batch_id,     // Transform
+                    title: session.title,
+                    description: session.description,
+                    date: session.date,
+                    duration: session.duration,
+                    location: session.location,
+                    createdAt: session.created_at, // Transform
+                    updatedAt: session.updated_at, // Transform
+                };
+
+                sendApiResponse(res, true, transformedSession, undefined, 200);
 
             } else {
                 // Handle GET /api/training_sessions
@@ -86,7 +99,21 @@ export default authMiddleware(async (req: VercelRequest & { user?: Omit<User, 'p
                 sql += ' ORDER BY date ASC';
 
                 const result = await client.query(sql, values);
-                sendApiResponse(res, true, result.rows as TrainingSession[], undefined, 200);
+
+                 // Transform snake_case from DB to camelCase for frontend
+                const transformedSessions: TrainingSession[] = result.rows.map(row => ({
+                    id: row.id,
+                    batchId: row.batch_id,     // Transform
+                    title: row.title,
+                    description: row.description,
+                    date: row.date,
+                    duration: row.duration,
+                    location: row.location,
+                    createdAt: row.created_at, // Transform
+                    updatedAt: row.updated_at, // Transform
+                }));
+
+                sendApiResponse(res, true, transformedSessions, undefined, 200);
             }
 
         } else if (req.method === 'POST') {
