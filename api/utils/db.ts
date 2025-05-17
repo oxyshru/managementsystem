@@ -1,7 +1,6 @@
 // api/utils/db.ts
-// Use require for pg to avoid potential ESM/CJS interop issues on Vercel
-import type { PoolClient } from 'pg'; // Import types only
-const { Pool } = require('pg'); // Use require for the Pool implementation
+// Use standard imports for Pool and PoolClient
+import { Pool, PoolClient } from 'pg'; // Use standard import
 
 // Database connection details from environment variables
 // Use DATABASE_URL if available (preferred for Render), otherwise fall back to individual variables
@@ -27,11 +26,11 @@ const dbConfig = connectionString ?
 
 
 // Create a connection pool
-// Use 'any' for the pool type for simplicity with require
-let pool: any | null = null;
+// Use the imported Pool type here
+let pool: Pool | null = null;
 
 // Use the imported Pool type here
-function getPool(): any { // Adjust return type
+function getPool(): Pool {
   if (!pool) {
     // Basic validation
     if (!dbConfig.connectionString && (!dbConfig.host || !dbConfig.user || !dbConfig.database)) {
@@ -39,7 +38,7 @@ function getPool(): any { // Adjust return type
         throw new Error("Database configuration is incomplete.");
     }
     // Instantiate the Pool class using the imported variable
-    pool = new Pool(dbConfig); // Pool is now the result of require
+    pool = new Pool(dbConfig);
     console.log("PostgreSQL database pool created.");
 
     // Optional: Add error handling for the pool
