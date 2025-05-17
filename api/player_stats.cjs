@@ -1,19 +1,19 @@
-// api/player_stats.ts
-import { VercelRequest, VercelResponse } from '@vercel/node';
-import { getConnection } from './utils/db';
-import { sendApiResponse } from './utils/apiResponse';
-import { authMiddleware } from './utils/authMiddleware';
-import { PlayerStats, User } from '../src/types/database.types';
-import { PoolClient } from 'pg';
+// api/player_stats.cjs
+const { VercelRequest, VercelResponse } = require('@vercel/node');
+const { getConnection } = require('./utils/db');
+const { sendApiResponse } = require('./utils/apiResponse');
+const { authMiddleware } = require('./utils/authMiddleware');
+// const { PlayerStats, User } = require('../src/types/database.types'); // Types not needed at runtime
+const { PoolClient } = require('pg');
 
 // Wrap the handler with authMiddleware
-export default authMiddleware(async (req: VercelRequest & { user?: Omit<User, 'password'> }, res: VercelResponse) => {
-    let client: PoolClient | undefined;
+exports.handler = authMiddleware(async (req, res) => { // Changed export default to exports.handler
+    let client; // Untyped variable
     try {
         client = await getConnection();
 
-        const playerStatsId = req.query.id ? parseInt(req.query.id as string, 10) : undefined;
-        const playerIdQuery = req.query.playerId ? parseInt(req.query.playerId as string, 10) : undefined; // Get playerId from query
+        const playerStatsId = req.query.id ? parseInt(req.query.id, 10) : undefined; // Use req.query.id directly
+        const playerIdQuery = req.query.playerId ? parseInt(req.query.playerId, 10) : undefined; // Get playerId from query
 
 
         if (req.method === 'GET') {
@@ -45,7 +45,7 @@ export default authMiddleware(async (req: VercelRequest & { user?: Omit<User, 'p
                  }
 
                 // Transform snake_case from DB to camelCase for frontend
-                const transformedStats: PlayerStats = {
+                const transformedStats = { // Untyped variable for CJS
                     id: stats.id,
                     playerId: stats.player_id,     // Transform
                     gamesPlayed: stats.games_played, // Transform
@@ -63,8 +63,8 @@ export default authMiddleware(async (req: VercelRequest & { user?: Omit<User, 'p
             } else {
                 // Handle GET /api/player_stats
                 let sql = 'SELECT id, player_id, games_played, goals_scored, assists, yellow_cards, red_cards, minutes_played, created_at, updated_at FROM player_stats';
-                const values: any[] = [];
-                const conditions: string[] = [];
+                const values = []; // Untyped variable
+                const conditions = []; // Untyped variable
                 let paramIndex = 1;
 
                 if (req.user?.role === 'player') {
@@ -108,7 +108,7 @@ export default authMiddleware(async (req: VercelRequest & { user?: Omit<User, 'p
                 const result = await client.query(sql, values);
 
                  // Transform snake_case from DB to camelCase for frontend
-                const transformedStatsList: PlayerStats[] = result.rows.map(row => ({
+                const transformedStatsList = result.rows.map(row => ({ // Untyped variable for CJS
                     id: row.id,
                     playerId: row.player_id,     // Transform
                     gamesPlayed: row.games_played, // Transform
@@ -172,8 +172,8 @@ export default authMiddleware(async (req: VercelRequest & { user?: Omit<User, 'p
              }
 
             const { gamesPlayed, goalsScored, assists, yellowCards, redCards, minutesPlayed } = req.body;
-            const updateFields: string[] = [];
-            const updateValues: any[] = [];
+            const updateFields = []; // Untyped variable
+            const updateValues = []; // Untyped variable
              let paramIndex = 1;
 
             if (gamesPlayed !== undefined) { updateFields.push(`games_played = $${paramIndex++}`); updateValues.push(gamesPlayed); }
