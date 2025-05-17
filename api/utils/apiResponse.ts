@@ -1,4 +1,5 @@
 // api/utils/apiResponse.ts
+// api/utils/apiResponse.ts
 import { VercelResponse } from '@vercel/node';
 
 // Define the ApiResponse type expected by the frontend
@@ -30,3 +31,4 @@ export function sendApiResponse<T>(
   };
   res.status(statusCode).json(responseBody);
 }
+
