@@ -3,7 +3,7 @@ import { VercelRequest, VercelResponse } from '@vercel/node';
 import { getConnection } from './utils/db';
 import { sendApiResponse } from './utils/apiResponse';
 import { authMiddleware } from './utils/authMiddleware';
-import { PerformanceNote, User } from '../src/types/database.types'; // Corrected import path
+import { PerformanceNote, User } from '../src/types/database.types';
 import { PoolClient } from 'pg';
 
 // Wrap the handler with authMiddleware
@@ -45,7 +45,18 @@ export default authMiddleware(async (req: VercelRequest & { user?: Omit<User, 'p
                      return;
                 }
 
-                sendApiResponse(res, true, note as PerformanceNote, undefined, 200);
+                // Transform snake_case from DB to camelCase for frontend
+                const transformedNote: PerformanceNote = {
+                    id: note.id,
+                    playerId: note.player_id,   // Transform
+                    coachId: note.coach_id,     // Transform
+                    date: note.date,
+                    note: note.note,
+                    createdAt: note.created_at, // Transform
+                    updatedAt: note.updated_at, // Transform
+                };
+
+                sendApiResponse(res, true, transformedNote, undefined, 200);
 
             } else {
                 // Handle GET /api/performance_notes
@@ -103,7 +114,19 @@ export default authMiddleware(async (req: VercelRequest & { user?: Omit<User, 'p
                 sql += ' ORDER BY date DESC, created_at DESC';
 
                 const result = await client.query(sql, values);
-                sendApiResponse(res, true, result.rows as PerformanceNote[], undefined, 200);
+
+                 // Transform snake_case from DB to camelCase for frontend
+                const transformedNotesList: PerformanceNote[] = result.rows.map(row => ({
+                    id: row.id,
+                    playerId: row.player_id,   // Transform
+                    coachId: row.coach_id,     // Transform
+                    date: row.date,
+                    note: row.note,
+                    createdAt: row.created_at, // Transform
+                    updatedAt: row.updated_at, // Transform
+                }));
+
+                sendApiResponse(res, true, transformedNotesList, undefined, 200);
             }
 
         } else if (req.method === 'POST') {
