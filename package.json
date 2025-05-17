@@ -86,6 +86,6 @@
   "author": "",
   "license": "ISC",
   "engines": {
-    "node": "22.x"  <-- CHANGED THIS TO 22.x
+    "node": "22.x" 
   }
 }
