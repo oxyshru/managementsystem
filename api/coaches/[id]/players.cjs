@@ -1,15 +1,15 @@
-// api/coaches/[id]/players.ts
-import { VercelRequest, VercelResponse } from '@vercel/node';
-import { getConnection } from '../../utils/db';
-import { sendApiResponse } from '../../utils/apiResponse';
-import { authMiddleware } from '../../utils/authMiddleware';
-import { Player, User } from '../../../src/types/database.types';
-import { PoolClient } from 'pg';
+// api/coaches/[id]/players.cjs
+const { VercelRequest, VercelResponse } = require('@vercel/node');
+const { getConnection } = require('../../utils/db');
+const { sendApiResponse } = require('../../utils/apiResponse');
+const { authMiddleware } = require('../../utils/authMiddleware');
+// const { Player, User } = require('../../../src/types/database.types'); // Types not needed at runtime
+const { PoolClient } = require('pg');
 
 
 // Wrap the handler with authMiddleware
-export default authMiddleware(async (req: VercelRequest & { user?: Omit<User, 'password'> }, res: VercelResponse) => {
-    const coachId = parseInt(req.query.id as string, 10);
+exports.handler = authMiddleware(async (req, res) => { // Changed export default to exports.handler
+    const coachId = parseInt(req.query.id, 10); // Use req.query.id directly
 
     if (isNaN(coachId)) {
         sendApiResponse(res, false, undefined, 'Invalid coach ID', 400);
@@ -21,7 +21,7 @@ export default authMiddleware(async (req: VercelRequest & { user?: Omit<User, 'p
         return;
     }
 
-    let client: PoolClient | undefined;
+    let client; // Untyped variable
     try {
         client = await getConnection();
 
@@ -55,7 +55,7 @@ export default authMiddleware(async (req: VercelRequest & { user?: Omit<User, 'p
         const result = await client.query('SELECT id, user_id, first_name, last_name, position, date_of_birth, height, weight, created_at, updated_at FROM players');
 
         // Transform snake_case from DB to camelCase for frontend
-        const transformedPlayers: Player[] = result.rows.map(row => ({
+        const transformedPlayers = result.rows.map(row => ({ // Untyped variable for CJS
             id: row.id,
             userId: row.user_id,           // Transform
             firstName: row.first_name,     // Transform
