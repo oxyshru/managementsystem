@@ -4,7 +4,7 @@ import { VercelRequest, VercelResponse } from '@vercel/node';
 import { getConnection } from './utils/db';
 import { sendApiResponse } from './utils/apiResponse';
 import { authMiddleware } from './utils/authMiddleware';
-import { User } from '../src/types/database.types'; // Corrected import path
+import { User } from '../src/types/database.types';
 import { PoolClient } from 'pg';
 
 // Wrap the handler with authMiddleware, requiring 'admin' role for GET
@@ -22,7 +22,19 @@ export default authMiddleware(async (req: VercelRequest & { user?: Omit<User, 'p
         // Fetch all users (excluding password)
         const result = await client.query('SELECT id, username, email, role, status, created_at, updated_at FROM users');
 
-        sendApiResponse(res, true, result.rows as User[], undefined, 200);
+        // Transform snake_case from DB to camelCase for frontend
+        const transformedUsers: User[] = result.rows.map(row => ({
+            id: row.id,
+            username: row.username,
+            email: row.email,
+            role: row.role,
+            status: row.status,
+            createdAt: row.created_at, // Transform
+            updatedAt: row.updated_at, // Transform
+        }));
+
+
+        sendApiResponse(res, true, transformedUsers, undefined, 200);
 
     } catch (error) {
         console.error('Get all users error:', error);
