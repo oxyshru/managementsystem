@@ -1,10 +1,10 @@
 // api/coaches/[id]/players.ts
 import { VercelRequest, VercelResponse } from '@vercel/node';
-import { getConnection } from '../../utils/db'; // Corrected path
-import { sendApiResponse } from '../../utils/apiResponse'; // Corrected path
-import { authMiddleware } from '../../utils/authMiddleware'; // Corrected path
-import { Player, User } from '../../../src/types/database.types'; // Corrected import path
-import { PoolClient } from 'pg'; // Import PoolClient type
+import { getConnection } from '../../utils/db';
+import { sendApiResponse } from '../../utils/apiResponse';
+import { authMiddleware } from '../../utils/authMiddleware';
+import { Player, User } from '../../../src/types/database.types';
+import { PoolClient } from 'pg';
 
 
 // Wrap the handler with authMiddleware
@@ -54,12 +54,23 @@ export default authMiddleware(async (req: VercelRequest & { user?: Omit<User, 'p
         console.warn(`Fetching players for coach ${coachId} is simplified in this demo backend. Returning all players.`);
         const result = await client.query('SELECT id, user_id, first_name, last_name, position, date_of_birth, height, weight, created_at, updated_at FROM players');
 
-        // In a real app, you would perform the JOINs and aggregation here
-        // to calculate attendance % and last attendance for this coach's sessions.
-        // The frontend currently simulates this augmentation based on mock data.
-        // If the backend provided this, the frontend coach dashboard would use it.
+        // Transform snake_case from DB to camelCase for frontend
+        const transformedPlayers: Player[] = result.rows.map(row => ({
+            id: row.id,
+            userId: row.user_id,           // Transform
+            firstName: row.first_name,     // Transform
+            lastName: row.last_name,       // Transform
+            position: row.position,
+            dateOfBirth: row.date_of_birth, // Transform
+            height: row.height,
+            weight: row.weight,
+            createdAt: row.created_at,     // Transform
+            updatedAt: row.updated_at,     // Transform
+            // Frontend mock-specific fields are not part of the DB response here
+        }));
 
-        sendApiResponse(res, true, result.rows as Player[], undefined, 200);
+
+        sendApiResponse(res, true, transformedPlayers, undefined, 200);
 
     } catch (error) {
         console.error('Get players for coach error:', error);
