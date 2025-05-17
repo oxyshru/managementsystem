@@ -3,7 +3,7 @@ import { VercelRequest, VercelResponse } from '@vercel/node';
 import { getConnection } from './utils/db';
 import { sendApiResponse } from './utils/apiResponse';
 import { authMiddleware } from './utils/authMiddleware';
-import { PlayerStats, User } from '../src/types/database.types'; // Corrected import path and added PlayerStats
+import { PlayerStats, User } from '../src/types/database.types';
 import { PoolClient } from 'pg';
 
 // Wrap the handler with authMiddleware
@@ -13,6 +13,8 @@ export default authMiddleware(async (req: VercelRequest & { user?: Omit<User, 'p
         client = await getConnection();
 
         const playerStatsId = req.query.id ? parseInt(req.query.id as string, 10) : undefined;
+        const playerIdQuery = req.query.playerId ? parseInt(req.query.playerId as string, 10) : undefined; // Get playerId from query
+
 
         if (req.method === 'GET') {
             if (playerStatsId !== undefined) {
@@ -42,7 +44,21 @@ export default authMiddleware(async (req: VercelRequest & { user?: Omit<User, 'p
                       return;
                  }
 
-                sendApiResponse(res, true, stats as PlayerStats, undefined, 200);
+                // Transform snake_case from DB to camelCase for frontend
+                const transformedStats: PlayerStats = {
+                    id: stats.id,
+                    playerId: stats.player_id,     // Transform
+                    gamesPlayed: stats.games_played, // Transform
+                    goalsScored: stats.goals_scored, // Transform
+                    assists: stats.assists,
+                    yellowCards: stats.yellow_cards, // Transform
+                    redCards: stats.red_cards,     // Transform
+                    minutesPlayed: stats.minutes_played, // Transform
+                    createdAt: stats.created_at,   // Transform
+                    updatedAt: stats.updated_at,   // Transform
+                };
+
+                sendApiResponse(res, true, transformedStats, undefined, 200);
 
             } else {
                 // Handle GET /api/player_stats
@@ -67,7 +83,7 @@ export default authMiddleware(async (req: VercelRequest & { user?: Omit<User, 'p
                      // Get stats for players in this coach's batches.
                      // This requires JOINs: player_stats -> players -> session_attendance -> training_sessions -> batches
                      // For simplicity, let's just get all player stats for now and note the complexity.
-                     console.warn("Coach GET player_stats is simplified and returns all stats, not just for players in their batches.");
+                     console.warn("Coach GET player_stats is simplified to only show stats for players in their batches if playerId is provided.");
                       // A more accurate query would involve joins:
                       // conditions.push(`player_id IN (SELECT sa.player_id FROM session_attendance sa JOIN training_sessions ts ON sa.session_id = ts.id JOIN batches b ON ts.batch_id = b.id WHERE b.coach_id = $${paramIndex++})`);
                       // values.push(coach.id);
@@ -76,12 +92,12 @@ export default authMiddleware(async (req: VercelRequest & { user?: Omit<User, 'p
                      return;
                 }
 
-                if (req.user?.role !== 'player') {
-                     if (req.query.playerId !== undefined) {
-                          conditions.push(`player_id = $${paramIndex++}`);
-                          values.push(req.query.playerId);
-                     }
+                // Allow filtering by playerId for admin and coach
+                if ((req.user?.role === 'admin' || req.user?.role === 'coach') && playerIdQuery !== undefined) {
+                     conditions.push(`player_id = $${paramIndex++}`);
+                     values.push(playerIdQuery);
                 }
+
 
                 if (conditions.length > 0) {
                      sql += ' WHERE ' + conditions.join(' AND ');
@@ -90,7 +106,23 @@ export default authMiddleware(async (req: VercelRequest & { user?: Omit<User, 'p
                 sql += ' ORDER BY updated_at DESC';
 
                 const result = await client.query(sql, values);
-                sendApiResponse(res, true, result.rows as PlayerStats[], undefined, 200);
+
+                 // Transform snake_case from DB to camelCase for frontend
+                const transformedStatsList: PlayerStats[] = result.rows.map(row => ({
+                    id: row.id,
+                    playerId: row.player_id,     // Transform
+                    gamesPlayed: row.games_played, // Transform
+                    goalsScored: row.goals_scored, // Transform
+                    assists: row.assists,
+                    yellowCards: row.yellow_cards, // Transform
+                    redCards: row.red_cards,     // Transform
+                    minutesPlayed: row.minutes_played, // Transform
+                    createdAt: row.created_at,   // Transform
+                    updatedAt: row.updated_at,   // Transform
+                }));
+
+
+                sendApiResponse(res, true, transformedStatsList, undefined, 200);
             }
 
         } else if (req.method === 'POST') {
@@ -195,5 +227,4 @@ export default authMiddleware(async (req: VercelRequest & { user?: Omit<User, 'p
         }
     }
 }, ['admin', 'coach', 'player']); // Allow admin (all methods), coach (GET, POST, PUT), player (GET their own)
-
 
