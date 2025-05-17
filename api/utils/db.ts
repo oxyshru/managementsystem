@@ -1,5 +1,7 @@
 // api/utils/db.ts
-import { Pool, PoolClient } from 'pg'; // Use pg library
+// import { Pool, PoolClient } from 'pg'; // Original import
+import pg from 'pg'; // Try default import
+const { Pool, PoolClient } = pg; // Destructure the required classes
 
 // Database connection details from environment variables
 const dbConfig = {
@@ -56,4 +58,3 @@ export async function getConnection(): Promise<PoolClient> {
     throw error; // Re-throw to be caught by the API endpoint handler
   }
 }
-
