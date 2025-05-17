@@ -3,7 +3,7 @@ import { VercelRequest, VercelResponse } from '@vercel/node';
 import { getConnection } from './utils/db';
 import { sendApiResponse } from './utils/apiResponse';
 import { authMiddleware } from './utils/authMiddleware';
-import { Batch, User } from '../src/types/database.types'; // Corrected import path
+import { Batch, User } from '../src/types/database.types';
 import { PoolClient } from 'pg';
 
 // Wrap the handler with authMiddleware
@@ -43,13 +43,36 @@ export default authMiddleware(async (req: VercelRequest & { user?: Omit<User, 'p
                      return;
                 }
 
-                sendApiResponse(res, true, batch as Batch, undefined, 200);
+                // Transform snake_case from DB to camelCase for frontend
+                const transformedBatch: Batch = {
+                    id: batch.id,
+                    gameId: batch.game_id,     // Transform
+                    name: batch.name,
+                    schedule: batch.schedule,
+                    coachId: batch.coach_id,   // Transform
+                    createdAt: batch.created_at, // Transform
+                    updatedAt: batch.updated_at, // Transform
+                };
+
+                sendApiResponse(res, true, transformedBatch, undefined, 200);
 
             } else {
                 // Handle GET /api/batches
                 // Allow any authenticated user to get the list of batches
                 const result = await client.query('SELECT id, game_id, name, schedule, coach_id, created_at, updated_at FROM batches');
-                sendApiResponse(res, true, result.rows as Batch[], undefined, 200);
+
+                 // Transform snake_case from DB to camelCase for frontend
+                const transformedBatches: Batch[] = result.rows.map(row => ({
+                    id: row.id,
+                    gameId: row.game_id,     // Transform
+                    name: row.name,
+                    schedule: row.schedule,
+                    coachId: row.coach_id,   // Transform
+                    createdAt: row.created_at, // Transform
+                    updatedAt: row.updated_at, // Transform
+                }));
+
+                sendApiResponse(res, true, transformedBatches, undefined, 200);
             }
 
         } else if (req.method === 'POST') {
