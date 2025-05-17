@@ -1,10 +1,10 @@
-// api/status.ts
-import { VercelRequest, VercelResponse } from '@vercel/node';
-import { getConnection } from './utils/db'; // Corrected import path
-import { sendApiResponse } from './utils/apiResponse'; // Corrected import path
-import { PoolClient } from 'pg'; // Import PoolClient type
+// api/status.cjs
+const { VercelRequest, VercelResponse } = require('@vercel/node');
+const { getConnection } = require('./utils/db'); // Corrected import path
+const { sendApiResponse } = require('./utils/apiResponse'); // Corrected import path
+const { PoolClient } = require('pg'); // Import PoolClient type
 
-export default async function handler(req: VercelRequest, res: VercelResponse) {
+exports.handler = async function handler(req, res) { // Changed export default to exports.handler
   // Handle OPTIONS preflight requests
   if (req.method === 'OPTIONS') {
       res.setHeader('Access-Control-Allow-Origin', process.env.ALLOWED_ORIGIN || '*');
@@ -19,7 +19,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return;
   }
 
-  let client: PoolClient | undefined; // Use PoolClient type
+  let client; // Use untyped variable for CJS
   try {
     // Attempt to get a connection to test the database
     client = await getConnection();
