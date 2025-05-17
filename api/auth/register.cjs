@@ -1,12 +1,12 @@
-// api/auth/register.ts
-import { VercelRequest, VercelResponse } from '@vercel/node';
-import { getConnection } from '../utils/db';
-import { sendApiResponse } from '../utils/apiResponse';
-import { generateMockToken } from '../utils/authMiddleware';
-import { User, Player, Coach, Game } from '../../src/types/database.types';
-import { PoolClient } from 'pg';
+// api/auth/register.cjs
+const { VercelRequest, VercelResponse } = require('@vercel/node');
+const { getConnection } = require('../utils/db');
+const { sendApiResponse } = require('../utils/apiResponse');
+const { generateMockToken } = require('../utils/authMiddleware');
+// const { User, Player, Coach, Game } = require('../../src/types/database.types'); // Types not needed at runtime
+const { PoolClient } = require('pg');
 
-export default async function handler(req: VercelRequest, res: VercelResponse) {
+exports.handler = async function handler(req, res) { // Changed export default to exports.handler
     // Handle OPTIONS preflight requests
     if (req.method === 'OPTIONS') {
         res.setHeader('Access-Control-Allow-Origin', process.env.ALLOWED_ORIGIN || '*');
@@ -45,7 +45,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     // Coach specialization/experience are optional in this demo INSERT
 
 
-    let client: PoolClient | undefined;
+    let client; // Untyped variable
     try {
         client = await getConnection();
 
@@ -113,7 +113,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
         // Return the new user data and token (excluding password)
         // Transform snake_case from DB to camelCase for frontend
-        const newUserResponseData: Omit<User, 'password'> & { token: string } = {
+        const newUserResponseData = { // Untyped variable for CJS
              id: newUser.id,
              username: newUser.username,
              email: newUser.email,
