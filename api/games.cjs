@@ -1,18 +1,18 @@
-// api/games.ts
-import { VercelRequest, VercelResponse } from '@vercel/node';
-import { getConnection } from './utils/db';
-import { sendApiResponse } from './utils/apiResponse';
-import { authMiddleware } from './utils/authMiddleware';
-import { Game, User } from '../src/types/database.types';
-import { PoolClient } from 'pg';
+// api/games.cjs
+const { VercelRequest, VercelResponse } = require('@vercel/node');
+const { getConnection } = require('./utils/db');
+const { sendApiResponse } = require('./utils/apiResponse');
+const { authMiddleware } = require('./utils/authMiddleware');
+// const { Game, User } = require('../src/types/database.types'); // Types not needed at runtime
+const { PoolClient } = require('pg');
 
 // Wrap the handler with authMiddleware
-export default authMiddleware(async (req: VercelRequest & { user?: Omit<User, 'password'> }, res: VercelResponse) => {
-    let client: PoolClient | undefined;
+exports.handler = authMiddleware(async (req, res) => { // Changed export default to exports.handler
+    let client; // Untyped variable
     try {
         client = await getConnection();
 
-        const gameId = req.query.id ? parseInt(req.query.id as string, 10) : undefined;
+        const gameId = req.query.id ? parseInt(req.query.id, 10) : undefined; // Use req.query.id directly
 
         if (req.method === 'GET') {
             if (gameId !== undefined) {
@@ -22,7 +22,7 @@ export default authMiddleware(async (req: VercelRequest & { user?: Omit<User, 'p
 
                 if (game) {
                      // Transform snake_case from DB to camelCase for frontend
-                    const transformedGame: Game = {
+                    const transformedGame = { // Untyped variable for CJS
                         id: game.id,
                         name: game.name,
                         createdAt: game.created_at, // Transform
@@ -39,7 +39,7 @@ export default authMiddleware(async (req: VercelRequest & { user?: Omit<User, 'p
                 const result = await client.query('SELECT id, name, created_at, updated_at FROM games');
 
                  // Transform snake_case from DB to camelCase for frontend
-                const transformedGames: Game[] = result.rows.map(row => ({
+                const transformedGames = result.rows.map(row => ({ // Untyped variable for CJS
                     id: row.id,
                     name: row.name,
                     createdAt: row.created_at, // Transform
