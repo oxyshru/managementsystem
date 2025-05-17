@@ -1,18 +1,18 @@
-// api/batches.ts
-import { VercelRequest, VercelResponse } from '@vercel/node';
-import { getConnection } from './utils/db';
-import { sendApiResponse } from './utils/apiResponse';
-import { authMiddleware } from './utils/authMiddleware';
-import { Batch, User } from '../src/types/database.types';
-import { PoolClient } from 'pg';
+// api/batches.cjs
+const { VercelRequest, VercelResponse } = require('@vercel/node');
+const { getConnection } = require('./utils/db');
+const { sendApiResponse } = require('./utils/apiResponse');
+const { authMiddleware } = require('./utils/authMiddleware');
+// const { Batch, User } = require('../src/types/database.types'); // Types not needed at runtime
+const { PoolClient } = require('pg');
 
 // Wrap the handler with authMiddleware
-export default authMiddleware(async (req: VercelRequest & { user?: Omit<User, 'password'> }, res: VercelResponse) => {
-    let client: PoolClient | undefined;
+exports.handler = authMiddleware(async (req, res) => { // Changed export default to exports.handler
+    let client; // Untyped variable
     try {
         client = await getConnection();
 
-        const batchId = req.query.id ? parseInt(req.query.id as string, 10) : undefined;
+        const batchId = req.query.id ? parseInt(req.query.id, 10) : undefined; // Use req.query.id directly
 
         if (req.method === 'GET') {
             if (batchId !== undefined) {
@@ -44,7 +44,7 @@ export default authMiddleware(async (req: VercelRequest & { user?: Omit<User, 'p
                 }
 
                 // Transform snake_case from DB to camelCase for frontend
-                const transformedBatch: Batch = {
+                const transformedBatch = { // Untyped variable for CJS
                     id: batch.id,
                     gameId: batch.game_id,     // Transform
                     name: batch.name,
@@ -62,7 +62,7 @@ export default authMiddleware(async (req: VercelRequest & { user?: Omit<User, 'p
                 const result = await client.query('SELECT id, game_id, name, schedule, coach_id, created_at, updated_at FROM batches');
 
                  // Transform snake_case from DB to camelCase for frontend
-                const transformedBatches: Batch[] = result.rows.map(row => ({
+                const transformedBatches = result.rows.map(row => ({ // Untyped variable for CJS
                     id: row.id,
                     gameId: row.game_id,     // Transform
                     name: row.name,
@@ -126,8 +126,8 @@ export default authMiddleware(async (req: VercelRequest & { user?: Omit<User, 'p
 
 
             const { gameId, name, schedule, coachId } = req.body;
-            const updateFields: string[] = [];
-            const updateValues: any[] = [];
+            const updateFields = []; // Untyped variable
+            const updateValues = []; // Untyped variable
              let paramIndex = 1;
 
             if (gameId !== undefined) { updateFields.push(`game_id = $${paramIndex++}`); updateValues.push(gameId); }
