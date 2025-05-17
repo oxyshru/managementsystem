@@ -3,7 +3,7 @@ import { VercelRequest, VercelResponse } from '@vercel/node';
 import { getConnection } from './utils/db';
 import { sendApiResponse } from './utils/apiResponse';
 import { authMiddleware } from './utils/authMiddleware';
-import { Game, User } from '../src/types/database.types'; // Corrected import path
+import { Game, User } from '../src/types/database.types';
 import { PoolClient } from 'pg';
 
 // Wrap the handler with authMiddleware
@@ -21,7 +21,14 @@ export default authMiddleware(async (req: VercelRequest & { user?: Omit<User, 'p
                 const game = result.rows[0];
 
                 if (game) {
-                    sendApiResponse(res, true, game as Game, undefined, 200);
+                     // Transform snake_case from DB to camelCase for frontend
+                    const transformedGame: Game = {
+                        id: game.id,
+                        name: game.name,
+                        createdAt: game.created_at, // Transform
+                        updatedAt: game.updated_at, // Transform
+                    };
+                    sendApiResponse(res, true, transformedGame, undefined, 200);
                 } else {
                     sendApiResponse(res, false, undefined, 'Game not found', 404);
                 }
@@ -30,7 +37,16 @@ export default authMiddleware(async (req: VercelRequest & { user?: Omit<User, 'p
                 // Handle GET /api/games
                 // Allow any authenticated user to get the list of games
                 const result = await client.query('SELECT id, name, created_at, updated_at FROM games');
-                sendApiResponse(res, true, result.rows as Game[], undefined, 200);
+
+                 // Transform snake_case from DB to camelCase for frontend
+                const transformedGames: Game[] = result.rows.map(row => ({
+                    id: row.id,
+                    name: row.name,
+                    createdAt: row.created_at, // Transform
+                    updatedAt: row.updated_at, // Transform
+                }));
+
+                sendApiResponse(res, true, transformedGames, undefined, 200);
             }
 
         } else if (req.method === 'POST') {
@@ -85,7 +101,7 @@ export default authMiddleware(async (req: VercelRequest & { user?: Omit<User, 'p
 
              const result = await client.query('UPDATE games SET name = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2', [name, gameId]);
 
-             sendApiResponse(res, true, { affectedRows: result.rowCount }, undefined, 200);
+            sendApiResponse(res, true, { affectedRows: result.rowCount }, undefined, 200);
 
 
         } else if (req.method === 'DELETE') {
