@@ -1,9 +1,12 @@
 // api/utils/db.ts
 // import { Pool, PoolClient } from 'pg'; // Original import (runtime + types)
+// import type { Pool, PoolClient } from 'pg'; // Previous attempt (type-only import)
 import pg from 'pg'; // Runtime import (fixes Vercel execution)
-import type { Pool, PoolClient } from 'pg'; // Type-only import (fixes TypeScript errors)
 
-const { Pool, PoolClient } = pg; // Destructure the required classes for runtime usage
+// Destructure the required classes for runtime usage
+// We will reference the types using pg.Pool and pg.PoolClient
+const { Pool, Client } = pg; // Use Client instead of PoolClient for the destructured variable
+
 
 // Database connection details from environment variables
 // Use DATABASE_URL if available (preferred for Render), otherwise fall back to individual variables
@@ -29,17 +32,18 @@ const dbConfig = connectionString ?
 
 
 // Create a connection pool
-// Use the imported Pool type here
-let pool: Pool | null = null;
+// Use the imported Pool type from the 'pg' namespace
+let pool: pg.Pool | null = null;
 
-// Use the imported Pool type here
-function getPool(): Pool {
+// Use the imported Pool type from the 'pg' namespace
+function getPool(): pg.Pool {
   if (!pool) {
     // Basic validation
     if (!dbConfig.connectionString && (!dbConfig.host || !dbConfig.user || !dbConfig.database)) {
         console.error("Missing required database environment variables (DATABASE_URL or individual params).");
         throw new Error("Database configuration is incomplete.");
     }
+    // Instantiate the Pool class using the destructured variable
     pool = new Pool(dbConfig);
     console.log("PostgreSQL database pool created.");
 
@@ -56,9 +60,10 @@ function getPool(): Pool {
  * Get a database connection from the pool.
  * Remember to release the connection using `client.release()`.
  */
-// Use the imported PoolClient type here
-export async function getConnection(): Promise<PoolClient> {
+// Use the imported PoolClient type from the 'pg' namespace
+export async function getConnection(): Promise<pg.PoolClient> {
   try {
+    // Connect using the pool
     const client = await getPool().connect();
     // console.log("Database connection obtained.");
     return client;
