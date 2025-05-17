@@ -3,7 +3,7 @@ import { VercelRequest, VercelResponse } from '@vercel/node';
 import { getConnection } from './utils/db';
 import { sendApiResponse } from './utils/apiResponse';
 import { authMiddleware } from './utils/authMiddleware';
-import { Coach, User } from '../src/types/database.types'; // Corrected import path
+import { Coach, User } from '../src/types/database.types';
 import { PoolClient } from 'pg';
 
 // Wrap the handler with authMiddleware
@@ -13,6 +13,8 @@ export default authMiddleware(async (req: VercelRequest & { user?: Omit<User, 'p
         client = await getConnection();
 
         const coachId = req.query.id ? parseInt(req.query.id as string, 10) : undefined;
+        const userId = req.query.userId ? parseInt(req.query.userId as string, 10) : undefined; // Added userId query param
+
 
         if (req.method === 'GET') {
             if (coachId !== undefined) {
@@ -32,7 +34,19 @@ export default authMiddleware(async (req: VercelRequest & { user?: Omit<User, 'p
                      return;
                 }
 
-                sendApiResponse(res, true, coach as Coach, undefined, 200);
+                // Transform snake_case from DB to camelCase for frontend
+                const transformedCoach: Coach = {
+                    id: coach.id,
+                    userId: coach.user_id,           // Transform
+                    firstName: coach.first_name,     // Transform
+                    lastName: coach.last_name,       // Transform
+                    specialization: coach.specialization,
+                    experience: coach.experience,
+                    createdAt: coach.created_at,     // Transform
+                    updatedAt: coach.updated_at,     // Transform
+                };
+
+                sendApiResponse(res, true, transformedCoach, undefined, 200);
 
             } else {
                 // Handle GET /api/coaches
@@ -42,8 +56,35 @@ export default authMiddleware(async (req: VercelRequest & { user?: Omit<User, 'p
                      return;
                 }
 
-                const result = await client.query('SELECT id, user_id, first_name, last_name, specialization, experience, created_at, updated_at FROM coaches');
-                sendApiResponse(res, true, result.rows as Coach[], undefined, 200);
+                let sql = 'SELECT id, user_id, first_name, last_name, specialization, experience, created_at, updated_at FROM coaches';
+                const values: any[] = [];
+                const conditions: string[] = [];
+                let paramIndex = 1;
+
+                if (userId !== undefined) { // Filter by userId if provided
+                     conditions.push(`user_id = $${paramIndex++}`);
+                     values.push(userId);
+                }
+
+                if (conditions.length > 0) {
+                    sql += ' WHERE ' + conditions.join(' AND ');
+                }
+
+                const result = await client.query(sql, values);
+
+                 // Transform snake_case from DB to camelCase for frontend
+                const transformedCoaches: Coach[] = result.rows.map(row => ({
+                    id: row.id,
+                    userId: row.user_id,           // Transform
+                    firstName: row.first_name,     // Transform
+                    lastName: row.last_name,       // Transform
+                    specialization: row.specialization,
+                    experience: row.experience,
+                    createdAt: row.created_at,     // Transform
+                    updatedAt: row.updated_at,     // Transform
+                }));
+
+                sendApiResponse(res, true, transformedCoaches, undefined, 200);
             }
 
         } else if (req.method === 'POST') {
