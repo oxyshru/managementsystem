@@ -1,7 +1,7 @@
 // api/utils/db.ts
-// api/utils/db.ts
-// Use standard imports for Pool and PoolClient
-import { Pool, PoolClient } from 'pg'; // Use standard import
+// Use require for pg to avoid potential ESM/CJS interop issues on Vercel
+import type { PoolClient } from 'pg'; // Import types only
+const { Pool } = require('pg'); // Use require for the Pool implementation
 
 // Database connection details from environment variables
 // Use DATABASE_URL if available (preferred for Render), otherwise fall back to individual variables
@@ -27,11 +27,11 @@ const dbConfig = connectionString ?
 
 
 // Create a connection pool
-// Use the imported Pool type here
-let pool: Pool | null = null;
+// Use 'any' for the pool type for simplicity with require
+let pool: any | null = null;
 
 // Use the imported Pool type here
-function getPool(): Pool {
+function getPool(): any { // Adjust return type
   if (!pool) {
     // Basic validation
     if (!dbConfig.connectionString && (!dbConfig.host || !dbConfig.user || !dbConfig.database)) {
@@ -39,11 +39,11 @@ function getPool(): Pool {
         throw new Error("Database configuration is incomplete.");
     }
     // Instantiate the Pool class using the imported variable
-    pool = new Pool(dbConfig);
+    pool = new Pool(dbConfig); // Pool is now the result of require
     console.log("PostgreSQL database pool created.");
 
     // Optional: Add error handling for the pool
-    pool.on('error', (err, client) => {
+    pool.on('error', (err: Error, client: PoolClient) => { // Use imported PoolClient type
         console.error('Unexpected error on idle client', err);
         // process.exit(-1); // Exiting might be too aggressive in a serverless function
     });
@@ -67,4 +67,3 @@ export async function getConnection(): Promise<PoolClient> {
     throw error; // Re-throw to be caught by the API endpoint handler
   }
 }
-
