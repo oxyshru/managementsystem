@@ -1,18 +1,18 @@
-// api/payments.ts
-import { VercelRequest, VercelResponse } from '@vercel/node';
-import { getConnection } from './utils/db';
-import { sendApiResponse } from './utils/apiResponse';
-import { authMiddleware } from './utils/authMiddleware';
-import { Payment, User } from '../src/types/database.types';
-import { PoolClient } from 'pg';
+// api/payments.cjs
+const { VercelRequest, VercelResponse } = require('@vercel/node');
+const { getConnection } = require('./utils/db');
+const { sendApiResponse } = require('./utils/apiResponse');
+const { authMiddleware } = require('./utils/authMiddleware');
+// const { Payment, User } = require('../src/types/database.types'); // Types not needed at runtime
+const { PoolClient } = require('pg');
 
 // Wrap the handler with authMiddleware
-export default authMiddleware(async (req: VercelRequest & { user?: Omit<User, 'password'> }, res: VercelResponse) => {
-    let client: PoolClient | undefined;
+exports.handler = authMiddleware(async (req, res) => { // Changed export default to exports.handler
+    let client; // Untyped variable
     try {
         client = await getConnection();
 
-        const paymentId = req.query.id ? parseInt(req.query.id as string, 10) : undefined;
+        const paymentId = req.query.id ? parseInt(req.query.id, 10) : undefined; // Use req.query.id directly
 
         if (req.method === 'GET') {
             if (paymentId !== undefined) {
@@ -38,7 +38,7 @@ export default authMiddleware(async (req: VercelRequest & { user?: Omit<User, 'p
                 }
 
                  // Transform snake_case from DB to camelCase for frontend
-                const transformedPayment: Payment = {
+                const transformedPayment = { // Untyped variable for CJS
                     id: payment.id,
                     playerId: payment.player_id,   // Transform
                     date: payment.date,
@@ -53,8 +53,8 @@ export default authMiddleware(async (req: VercelRequest & { user?: Omit<User, 'p
             } else {
                 // Handle GET /api/payments
                 let sql = 'SELECT id, player_id, date, amount, description, created_at, updated_at FROM payments';
-                const values: any[] = [];
-                const conditions: string[] = [];
+                const values = []; // Untyped variable
+                const conditions = []; // Untyped variable
                 let paramIndex = 1;
 
                 if (req.user?.role === 'player') {
@@ -95,7 +95,7 @@ export default authMiddleware(async (req: VercelRequest & { user?: Omit<User, 'p
                 const result = await client.query(sql, values);
 
                  // Transform snake_case from DB to camelCase for frontend
-                const transformedPayments: Payment[] = result.rows.map(row => ({
+                const transformedPayments = result.rows.map(row => ({ // Untyped variable for CJS
                     id: row.id,
                     playerId: row.player_id,   // Transform
                     date: row.date,
@@ -144,8 +144,8 @@ export default authMiddleware(async (req: VercelRequest & { user?: Omit<User, 'p
              }
 
             const { playerId, date, amount, description } = req.body;
-            const updateFields: string[] = [];
-            const updateValues: any[] = [];
+            const updateFields = []; // Untyped variable
+            const updateValues = []; // Untyped variable
              let paramIndex = 1;
 
             if (playerId !== undefined) { updateFields.push(`player_id = $${paramIndex++}`); updateValues.push(playerId); }
