@@ -1,18 +1,18 @@
-// api/training_sessions.ts
-import { VercelRequest, VercelResponse } from '@vercel/node';
-import { getConnection } from './utils/db';
-import { sendApiResponse } from './utils/apiResponse';
-import { authMiddleware } from './utils/authMiddleware';
-import { TrainingSession, User } from '../src/types/database.types';
-import { PoolClient } from 'pg';
+// api/training_sessions.cjs
+const { VercelRequest, VercelResponse } = require('@vercel/node');
+const { getConnection } = require('./utils/db');
+const { sendApiResponse } = require('./utils/apiResponse');
+const { authMiddleware } = require('./utils/authMiddleware');
+// const { TrainingSession, User } = require('../src/types/database.types'); // Types not needed at runtime
+const { PoolClient } = require('pg');
 
 // Wrap the handler with authMiddleware
-export default authMiddleware(async (req: VercelRequest & { user?: Omit<User, 'password'> }, res: VercelResponse) => {
-    let client: PoolClient | undefined;
+exports.handler = authMiddleware(async (req, res) => { // Changed export default to exports.handler
+    let client; // Untyped variable
     try {
         client = await getConnection();
 
-        const sessionId = req.query.id ? parseInt(req.query.id as string, 10) : undefined;
+        const sessionId = req.query.id ? parseInt(req.query.id, 10) : undefined; // Use req.query.id directly
 
         if (req.method === 'GET') {
             if (sessionId !== undefined) {
@@ -51,7 +51,7 @@ export default authMiddleware(async (req: VercelRequest & { user?: Omit<User, 'p
                 }
 
                 // Transform snake_case from DB to camelCase for frontend
-                const transformedSession: TrainingSession = {
+                const transformedSession = { // Untyped variable for CJS
                     id: session.id,
                     batchId: session.batch_id,     // Transform
                     title: session.title,
@@ -68,8 +68,8 @@ export default authMiddleware(async (req: VercelRequest & { user?: Omit<User, 'p
             } else {
                 // Handle GET /api/training_sessions
                 let sql = 'SELECT id, batch_id, title, description, date, duration, location, created_at, updated_at FROM training_sessions';
-                const values: any[] = [];
-                const conditions: string[] = [];
+                const values = []; // Untyped variable
+                const conditions = []; // Untyped variable
                 let paramIndex = 1;
 
                 if (req.user?.role === 'coach' && req.query.coachId === undefined) {
@@ -101,7 +101,7 @@ export default authMiddleware(async (req: VercelRequest & { user?: Omit<User, 'p
                 const result = await client.query(sql, values);
 
                  // Transform snake_case from DB to camelCase for frontend
-                const transformedSessions: TrainingSession[] = result.rows.map(row => ({
+                const transformedSessions = result.rows.map(row => ({ // Untyped variable for CJS
                     id: row.id,
                     batchId: row.batch_id,     // Transform
                     title: row.title,
@@ -166,8 +166,8 @@ export default authMiddleware(async (req: VercelRequest & { user?: Omit<User, 'p
              }
 
             const { batchId, title, description, date, duration, location } = req.body;
-            const updateFields: string[] = [];
-            const updateValues: any[] = [];
+            const updateFields = []; // Untyped variable
+            const updateValues = []; // Untyped variable
              let paramIndex = 1;
 
             if (batchId !== undefined) { updateFields.push(`batch_id = $${paramIndex++}`); updateValues.push(batchId); }
