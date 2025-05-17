@@ -3,8 +3,8 @@ import { VercelRequest, VercelResponse } from '@vercel/node';
 import { getConnection } from '../utils/db';
 import { sendApiResponse } from '../utils/apiResponse';
 import { generateMockToken } from '../utils/authMiddleware';
-import { User, Player, Coach, Game } from '../../src/types/database.types'; // Corrected import path
-import { PoolClient } from 'pg'; // Import PoolClient type
+import { User, Player, Coach, Game } from '../../src/types/database.types';
+import { PoolClient } from 'pg';
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
     // Handle OPTIONS preflight requests
@@ -37,8 +37,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     // Specific validation based on role
     if (role === 'player') {
-         // Frontend sends sports as string[], backend needs to handle linking to games table
-         // Let's enforce sports selection for players as per frontend validation.
          if (!Array.isArray(sports) || sports.length === 0) {
               sendApiResponse(res, false, undefined, 'Player registration requires selecting at least one sport.', 400);
               return;
@@ -47,7 +45,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     // Coach specialization/experience are optional in this demo INSERT
 
 
-    let client: PoolClient | undefined; // Use PoolClient type
+    let client: PoolClient | undefined;
     try {
         client = await getConnection();
 
@@ -64,7 +62,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         // 1. Create User
         // In a real app, hash the password here
         const userResult = await client.query(
-            'INSERT INTO users (username, email, password, role, status) VALUES ($1, $2, $3, $4, $5) RETURNING id, username, email, role, status, created_at, updated_at', // Use $n placeholders and RETURNING
+            'INSERT INTO users (username, email, password, role, status) VALUES ($1, $2, $3, $4, $5) RETURNING id, username, email, role, status, created_at, updated_at',
             [username, email, password, role, 'active'] // Default status to active on registration
         );
         const newUser = userResult.rows[0];
@@ -76,7 +74,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         if (role === 'player') {
              // Create Player profile
             const playerResult = await client.query(
-                'INSERT INTO players (user_id, first_name, last_name) VALUES ($1, $2, $3) RETURNING id', // Use $n placeholders and RETURNING
+                'INSERT INTO players (user_id, first_name, last_name) VALUES ($1, $2, $3) RETURNING id',
                 [newUserId, firstName, lastName]
             );
              newProfileId = playerResult.rows[0].id;
@@ -99,7 +97,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         } else if (role === 'coach') {
             const coachResult = await client.query(
                  // Simplified Coach creation - specialization and experience are optional in this demo INSERT
-                'INSERT INTO coaches (user_id, first_name, last_name, specialization, experience) VALUES ($1, $2, $3, $4, $5) RETURNING id', // Use $n placeholders and RETURNING
+                'INSERT INTO coaches (user_id, first_name, last_name, specialization, experience) VALUES ($1, $2, $3, $4, $5) RETURNING id',
                 [newUserId, firstName, lastName, specialization || null, experience || null]
             );
              newProfileId = coachResult.rows[0].id;
@@ -114,15 +112,16 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
          const token = generateMockToken(newUser);
 
         // Return the new user data and token (excluding password)
-        const newUserResponseData = {
+        // Transform snake_case from DB to camelCase for frontend
+        const newUserResponseData: Omit<User, 'password'> & { token: string } = {
              id: newUser.id,
              username: newUser.username,
              email: newUser.email,
              role: newUser.role,
              status: newUser.status,
-             createdAt: newUser.created_at,
-             updatedAt: newUser.updated_at,
-             token: token, // Include the token
+             createdAt: newUser.created_at, // Transform
+             updatedAt: newUser.updated_at, // Transform
+             token: token,
         };
 
 
@@ -140,5 +139,4 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         }
     }
 }
-
 
