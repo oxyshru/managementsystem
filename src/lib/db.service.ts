@@ -1,10 +1,6 @@
 // src/lib/db.service.ts
 // This service will now make HTTP requests to your backend API
 
-// Removed localStorage simulation imports and types
-// import { dbConfig } from '@/lib/db.config'; // No longer needed for connection logic
-// import { SimulatedDatabase } from '@/types/database.types'; // No longer needed
-
 import { ApiResponse, User, Player, Coach, PlayerStats, TrainingSession, Attendance, Batch, Payment, Game } from '@/types/database.types';
 
 // Use a base path for API calls, typically '/api' when deployed on Vercel
@@ -34,7 +30,11 @@ async function callApi<T>(
     };
 
     // Construct the full URL using the base path and endpoint
-    const response = await fetch(`${API_BASE_PATH}${endpoint}`, {
+    // Ensure the endpoint starts with a '/' if API_BASE_PATH is defined
+    const fullUrl = `${API_BASE_PATH}${endpoint.startsWith('/') ? endpoint : '/' + endpoint}`;
+
+
+    const response = await fetch(fullUrl, { // Use fullUrl here
       method,
       headers,
       body: data ? JSON.stringify(data) : undefined,
@@ -90,9 +90,6 @@ async function callApi<T>(
 
 /**
  * Database service to handle API interactions with the backend
- * NOTE: This service now makes HTTP calls to your backend API endpoints
- * that are expected to be at /api/<tableName> or /api/<tableName>/<id>.
- * Adjust endpoint paths if your backend routing differs.
  */
 class DbService {
   /**
@@ -102,7 +99,6 @@ class DbService {
    * @returns Promise with the record or error
    */
   async getById<T>(endpointBase: string, id: number): Promise<ApiResponse<T>> {
-    // Example: GET /api/users/1
     return callApi<T>(`${endpointBase}/${id}`);
   }
 
@@ -116,7 +112,6 @@ class DbService {
     endpointBase: string,
     params?: Record<string, any>
   ): Promise<ApiResponse<T[]>> {
-    // Example: GET /api/users?role=player
     const queryParams = params ? new URLSearchParams(params).toString() : '';
     return callApi<T[]>(`${endpointBase}${queryParams ? `?${queryParams}` : ''}`);
   }
@@ -128,7 +123,7 @@ class DbService {
    * @returns Promise with the inserted record ID or error
    */
   async insert<T>(endpointBase: string, data: any): Promise<ApiResponse<{ id: number; }>> {
-     // Example: POST /api/users with data in body
+     // The backend should handle adding id, createdAt, updatedAt
     return callApi<{ id: number }>(endpointBase, 'POST', data);
   }
 
@@ -140,7 +135,6 @@ class DbService {
    * @returns Promise with success status or error
    */
   async update<T>(endpointBase: string, id: number, data: Partial<T>): Promise<ApiResponse<{ affectedRows: number; }>> {
-    // Example: PUT /api/users/1 with data in body
     return callApi<{ affectedRows: number }>(`${endpointBase}/${id}`, 'PUT', data);
   }
 
@@ -151,7 +145,6 @@ class DbService {
    * @returns Promise with success status or error
    */
   async delete(endpointBase: string, id: number): Promise<ApiResponse<{ affectedRows: number; }>> {
-     // Example: DELETE /api/users/1
     return callApi<{ affectedRows: number }>(`${endpointBase}/${id}`, 'DELETE');
   }
 
@@ -162,13 +155,38 @@ class DbService {
    */
   async testConnection(): Promise<ApiResponse<{ connected: boolean; }>> {
           // Calls the backend's /api/status endpoint
+          // Explicitly call the /status endpoint relative to the API base path
           return callApi<{ connected: boolean }>('/status');
   }
 
   // The resetDatabase function would also need to call a backend endpoint
   async resetDatabase(): Promise<ApiResponse<void>> {
-       // Calls the backend's /api/admin/reset-db endpoint (use with caution!)
-       return callApi<void>('/admin/reset-db', 'POST');
+       // Replace with a call to your backend's reset endpoint (use with caution!)
+       try {
+           // Explicitly call the /admin/reset-db endpoint relative to the API base path
+           const response = await fetch(`${API_BASE_PATH}/admin/reset-db`, { // Use API_BASE_PATH here
+               method: 'POST',
+                headers: { // Include auth header for admin endpoint
+                   'Authorization': `Bearer ${localStorage.getItem('authToken')}`
+                },
+           }); // Example endpoint
+           if (response.ok) {
+               console.log("Backend database reset initiated.");
+               return { success: true };
+           } else {
+                const errorData = await response.json().catch(() => ({}));
+                return {
+                    success: false,
+                    error: errorData.message || `Backend database reset failed: ${response.statusText}`
+                };
+           }
+       } catch (error) {
+           console.error('Backend database reset failed:', error);
+           return {
+               success: false,
+               error: error instanceof Error ? error.message : 'Network error during backend database reset'
+           };
+       }
    }
 }
 
