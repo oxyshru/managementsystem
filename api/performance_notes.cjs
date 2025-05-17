@@ -1,18 +1,18 @@
-// api/performance_notes.ts
-import { VercelRequest, VercelResponse } from '@vercel/node';
-import { getConnection } from './utils/db';
-import { sendApiResponse } from './utils/apiResponse';
-import { authMiddleware } from './utils/authMiddleware';
-import { PerformanceNote, User } from '../src/types/database.types';
-import { PoolClient } from 'pg';
+// api/performance_notes.cjs
+const { VercelRequest, VercelResponse } = require('@vercel/node');
+const { getConnection } = require('./utils/db');
+const { sendApiResponse } = require('./utils/apiResponse');
+const { authMiddleware } = require('./utils/authMiddleware');
+// const { PerformanceNote, User } = require('../src/types/database.types'); // Types not needed at runtime
+const { PoolClient } = require('pg');
 
 // Wrap the handler with authMiddleware
-export default authMiddleware(async (req: VercelRequest & { user?: Omit<User, 'password'> }, res: VercelResponse) => {
-    let client: PoolClient | undefined;
+exports.handler = authMiddleware(async (req, res) => { // Changed export default to exports.handler
+    let client; // Untyped variable
     try {
         client = await getConnection();
 
-        const noteId = req.query.id ? parseInt(req.query.id as string, 10) : undefined;
+        const noteId = req.query.id ? parseInt(req.query.id, 10) : undefined; // Use req.query.id directly
 
         if (req.method === 'GET') {
             if (noteId !== undefined) {
@@ -46,7 +46,7 @@ export default authMiddleware(async (req: VercelRequest & { user?: Omit<User, 'p
                 }
 
                 // Transform snake_case from DB to camelCase for frontend
-                const transformedNote: PerformanceNote = {
+                const transformedNote = { // Untyped variable for CJS
                     id: note.id,
                     playerId: note.player_id,   // Transform
                     coachId: note.coach_id,     // Transform
@@ -61,8 +61,8 @@ export default authMiddleware(async (req: VercelRequest & { user?: Omit<User, 'p
             } else {
                 // Handle GET /api/performance_notes
                 let sql = 'SELECT id, player_id, coach_id, date, note, created_at, updated_at FROM performance_notes';
-                const values: any[] = [];
-                const conditions: string[] = [];
+                const values = []; // Untyped variable
+                const conditions = []; // Untyped variable
                 let paramIndex = 1;
 
                 if (req.user?.role === 'player') {
@@ -116,7 +116,7 @@ export default authMiddleware(async (req: VercelRequest & { user?: Omit<User, 'p
                 const result = await client.query(sql, values);
 
                  // Transform snake_case from DB to camelCase for frontend
-                const transformedNotesList: PerformanceNote[] = result.rows.map(row => ({
+                const transformedNotesList = result.rows.map(row => ({ // Untyped variable for CJS
                     id: row.id,
                     playerId: row.player_id,   // Transform
                     coachId: row.coach_id,     // Transform
@@ -185,8 +185,8 @@ export default authMiddleware(async (req: VercelRequest & { user?: Omit<User, 'p
              }
 
             const { date, note: noteContent } = req.body;
-            const updateFields: string[] = [];
-            const updateValues: any[] = [];
+            const updateFields = []; // Untyped variable
+            const updateValues = []; // Untyped variable
              let paramIndex = 1;
 
             if (date !== undefined) { updateFields.push(`date = $${paramIndex++}`); updateValues.push(date); }
