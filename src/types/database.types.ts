@@ -105,29 +105,29 @@ export interface Payment { // Add export keyword
     updatedAt: Date;
 }
 
-// Player Stats interface
+// Player Stats interface - UPDATED TO CAMELCASE
 export interface PlayerStats { // Add export keyword
     id: number;
-    player_id: number; // Use snake_case to match DB schema
-    games_played: number; // Use snake_case to match DB schema
-    goals_scored: number; // Use snake_case to match DB schema
-    assists: number; // Use snake_case to match DB schema
-    yellow_cards: number; // Use snake_case to match DB schema
-    red_cards: number; // Use snake_case to match DB schema
-    minutes_played: number; // Use snake_case to match DB schema
-    created_at: Date; // Use snake_case to match DB schema
-    updated_at: Date; // Use snake_case to match DB schema
+    playerId: number; // Changed from player_id
+    gamesPlayed: number; // Changed from games_played
+    goalsScored: number; // Changed from goals_scored
+    assists: number;
+    yellowCards: number; // Changed from yellow_cards
+    redCards: number; // Changed from red_cards
+    minutesPlayed: number; // Changed from minutes_played
+    createdAt: Date; // Changed from created_at
+    updatedAt: Date; // Changed from updated_at
 }
 
-// Performance Notes
+// Performance Notes - UPDATED TO CAMELCASE
 export interface PerformanceNote { // Add export keyword
     id: number;
-    player_id: number; // Use snake_case to match DB schema
-    coach_id?: number; // Use snake_case to match DB schema
+    playerId: number; // Changed from player_id
+    coachId?: number; // Changed from coach_id
     date: Date; // This is the type for the actual DB model/fetched data
     note: string;
-    created_at: Date; // Use snake_case to match DB schema
-    updated_at: Date; // Use snake_case to match DB schema
+    createdAt: Date; // Changed from created_at
+    updatedAt: Date; // Changed from updated_at
 }
 
 // --- Seed Data Interfaces (to match the structure of the initialSeedData object literals) ---
@@ -231,14 +231,14 @@ export interface SimulatedDatabase { // Add export keyword
   users: User[];
   players: Player[];
   coaches: Coach[];
-  player_stats: PlayerStats[];
+  player_stats: PlayerStats[]; // Use camelCase interface here
   training_sessions: TrainingSession[];
   attendance: Attendance[];
   batches: Batch[];
   payments: Payment[];
   games: Game[];
   // Use the actual PerformanceNote type here for consistency with frontend usage
-  performance_notes: PerformanceNote[];
+  performance_notes: PerformanceNote[]; // Use camelCase interface here
 }
 
 
