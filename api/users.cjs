@@ -1,21 +1,21 @@
-// api/users.ts
+// api/users.cjs
 // This file handles the GET all users endpoint
-import { VercelRequest, VercelResponse } from '@vercel/node';
-import { getConnection } from './utils/db';
-import { sendApiResponse } from './utils/apiResponse';
-import { authMiddleware } from './utils/authMiddleware';
-import { User } from '../src/types/database.types';
-import { PoolClient } from 'pg';
+const { VercelRequest, VercelResponse } = require('@vercel/node');
+const { getConnection } = require('./utils/db');
+const { sendApiResponse } = require('./utils/apiResponse');
+const { authMiddleware } = require('./utils/authMiddleware');
+// const { User } = require('../src/types/database.types'); // Types not needed at runtime
+const { PoolClient } = require('pg');
 
 // Wrap the handler with authMiddleware, requiring 'admin' role for GET
-export default authMiddleware(async (req: VercelRequest & { user?: Omit<User, 'password'> }, res: VercelResponse) => {
+exports.handler = authMiddleware(async (req, res) => { // Changed export default to exports.handler
     if (req.method !== 'GET') {
         sendApiResponse(res, false, undefined, 'Method Not Allowed', 405);
         return;
     }
 
     // The authMiddleware already checked for admin role, so we can proceed
-    let client: PoolClient | undefined;
+    let client; // Untyped variable
     try {
         client = await getConnection();
 
@@ -23,7 +23,7 @@ export default authMiddleware(async (req: VercelRequest & { user?: Omit<User, 'p
         const result = await client.query('SELECT id, username, email, role, status, created_at, updated_at FROM users');
 
         // Transform snake_case from DB to camelCase for frontend
-        const transformedUsers: User[] = result.rows.map(row => ({
+        const transformedUsers = result.rows.map(row => ({ // Untyped variable for CJS
             id: row.id,
             username: row.username,
             email: row.email,
