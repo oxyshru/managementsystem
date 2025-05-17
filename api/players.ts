@@ -3,7 +3,7 @@ import { VercelRequest, VercelResponse } from '@vercel/node';
 import { getConnection } from './utils/db';
 import { sendApiResponse } from './utils/apiResponse';
 import { authMiddleware } from './utils/authMiddleware';
-import { Player, User } from '../src/types/database.types'; // Corrected import path
+import { Player, User } from '../src/types/database.types';
 import { PoolClient } from 'pg';
 
 // Wrap the handler with authMiddleware
@@ -13,6 +13,8 @@ export default authMiddleware(async (req: VercelRequest & { user?: Omit<User, 'p
         client = await getConnection();
 
         const playerId = req.query.id ? parseInt(req.query.id as string, 10) : undefined;
+        const userIdQuery = req.query.userId ? parseInt(req.query.userId as string, 10) : undefined; // Added userId query param
+
 
         if (req.method === 'GET') {
             if (playerId !== undefined) {
@@ -32,7 +34,22 @@ export default authMiddleware(async (req: VercelRequest & { user?: Omit<User, 'p
                      return;
                 }
 
-                sendApiResponse(res, true, player as Player, undefined, 200);
+                // Transform snake_case from DB to camelCase for frontend
+                const transformedPlayer: Player = {
+                    id: player.id,
+                    userId: player.user_id,           // Transform
+                    firstName: player.first_name,     // Transform
+                    lastName: player.last_name,       // Transform
+                    position: player.position,
+                    dateOfBirth: player.date_of_birth, // Transform
+                    height: player.height,
+                    weight: player.weight,
+                    createdAt: player.created_at,     // Transform
+                    updatedAt: player.updated_at,     // Transform
+                    // Frontend mock-specific fields are not part of the DB response here
+                };
+
+                sendApiResponse(res, true, transformedPlayer, undefined, 200);
 
             } else {
                 // Handle GET /api/players
@@ -42,8 +59,39 @@ export default authMiddleware(async (req: VercelRequest & { user?: Omit<User, 'p
                      return;
                 }
 
-                const result = await client.query('SELECT id, user_id, first_name, last_name, position, date_of_birth, height, weight, created_at, updated_at FROM players');
-                sendApiResponse(res, true, result.rows as Player[], undefined, 200);
+                let sql = 'SELECT id, user_id, first_name, last_name, position, date_of_birth, height, weight, created_at, updated_at FROM players';
+                const values: any[] = [];
+                const conditions: string[] = [];
+                let paramIndex = 1;
+
+                if (userIdQuery !== undefined) { // Filter by userId if provided
+                     conditions.push(`user_id = $${paramIndex++}`);
+                     values.push(userIdQuery);
+                }
+
+
+                if (conditions.length > 0) {
+                     sql += ' WHERE ' + conditions.join(' AND ');
+                }
+
+                const result = await client.query(sql, values);
+
+                 // Transform snake_case from DB to camelCase for frontend
+                const transformedPlayers: Player[] = result.rows.map(row => ({
+                    id: row.id,
+                    userId: row.user_id,           // Transform
+                    firstName: row.first_name,     // Transform
+                    lastName: row.last_name,       // Transform
+                    position: row.position,
+                    dateOfBirth: row.date_of_birth, // Transform
+                    height: row.height,
+                    weight: row.weight,
+                    createdAt: row.created_at,     // Transform
+                    updatedAt: row.updated_at,     // Transform
+                    // Frontend mock-specific fields are not part of the DB response here
+                }));
+
+                sendApiResponse(res, true, transformedPlayers, undefined, 200);
             }
 
         } else if (req.method === 'POST') {
