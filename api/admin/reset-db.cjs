@@ -1,30 +1,16 @@
-// api/admin/reset-db.ts
-import { VercelRequest, VercelResponse } from '@vercel/node';
-import { getConnection } from '../utils/db';
-import { sendApiResponse } from '../utils/apiResponse';
-import { authMiddleware } from '../utils/authMiddleware';
-import { generateMockToken } from '../utils/authMiddleware';
-// Import necessary types
-import {
-    User, Player, Coach, Game, Batch, Payment, TrainingSession, Attendance, PerformanceNote, PlayerStats,
-    UserSeed, PlayerSeed, CoachSeed, GameSeed, BatchSeed, PaymentSeed, TrainingSessionSeed, AttendanceSeed, PerformanceNoteSeed, PlayerGameSeed
-} from '../../src/types/database.types'; // Corrected import path
-import { PoolClient } from 'pg';
+// api/admin/reset-db.cjs
+const { VercelRequest, VercelResponse } = require('@vercel/node');
+const { getConnection } = require('../utils/db');
+const { sendApiResponse } = require('../utils/apiResponse');
+const { authMiddleware } = require('../utils/authMiddleware');
+// Import necessary types (types are not needed at runtime in CJS, but keep for reference if converting back to TS later)
+// const { User, Player, Coach, Game, Batch, Payment, TrainingSession, Attendance, PerformanceNote, PlayerStats, UserSeed, PlayerSeed, CoachSeed, GameSeed, BatchSeed, PaymentSeed, TrainingSessionSeed, AttendanceSeed, PerformanceNoteSeed, PlayerGameSeed } = require('../../src/types/database.types'); // Corrected import path - types are not needed at runtime
+const { PoolClient } = require('pg');
 
 
 // Initial seed data (matches the structure for SQL INSERTs - uses snake_case for DB columns)
-const initialSeedData: {
-    users: UserSeed[];
-    players: PlayerSeed[];
-    coaches: CoachSeed[];
-    games: GameSeed[];
-    batches: BatchSeed[];
-    payments: PaymentSeed[];
-    performance_notes: PerformanceNoteSeed[];
-    player_games: PlayerGameSeed[];
-    training_sessions: TrainingSessionSeed[];
-    attendance: AttendanceSeed[];
-} = {
+// Keep this data structure as is, it's used to build the SQL
+const initialSeedData = {
     users: [
         { username: 'admin', email: 'admin@example.com', password: 'password123', role: 'admin', status: 'active' },
         { username: 'coach1', email: 'coach@example.com', password: 'password123', role: 'coach', status: 'active' },
@@ -87,7 +73,7 @@ const initialSeedData: {
 
 
 // Helper to execute multiple SQL statements
-async function executeSqlStatements(client: PoolClient, sql: string): Promise<void> {
+async function executeSqlStatements(client, sql) { // Use untyped variables for CJS
      await client.query(sql);
 }
 
@@ -247,10 +233,7 @@ CREATE TABLE performance_notes (
 `;
 
 // SQL to insert seed data (simplified - assumes IDs match initialSeedData)
-// In a real app, you'd get generated IDs after inserts and use those for foreign keys.
-// For this demo, we'll insert and then link using the *mock* IDs, which is fragile
-// but simpler for a direct translation of the MySQL seed data structure.
-// A better approach would be to insert sequentially and use RETURNING id.
+// Added setval calls to reset sequences after explicit ID inserts
 const seedSql = `
 INSERT INTO users (id, username, email, password, role, status, created_at, updated_at) VALUES
 (1, 'admin', 'admin@example.com', 'password123', 'admin', 'active', NOW(), NOW()),
@@ -301,7 +284,7 @@ SELECT setval('batches_id_seq', (SELECT MAX(id) FROM batches));
 INSERT INTO training_sessions (id, batch_id, title, description, date, duration, location, created_at, updated_at) VALUES
 (1, 1, 'Badminton Footwork', 'Drills focusing on court movement', '2025-05-17 09:00:00+00', 90, 'Court 1', NOW(), NOW()),
 (2, 1, 'Badminton Serve Practice', 'Improving serve accuracy and power', '2025-05-19 09:00:00+00', 60, 'Court 1', NOW(), NOW()),
-(3, 2, 'Swimming Technique', 'Freestyle stroke correction', '2025-05-18 16:00:00+00', 90, 'Pool Lane 2', NOW(), NOW());
+(3, 2, 'Swimming Technique', 'Freestyle stroke correction', date '2025-05-18 16:00:00+00', 90, 'Pool Lane 2', NOW(), NOW());
 
 SELECT setval('training_sessions_id_seq', (SELECT MAX(id) FROM training_sessions));
 
@@ -317,10 +300,10 @@ SELECT setval('payments_id_seq', (SELECT MAX(id) FROM payments));
 
 
 INSERT INTO performance_notes (id, player_id, coach_id, date, note, created_at, updated_at) VALUES
-(1, 1, 1, 'Significant improvement in backhand technique', NOW(), NOW()),
-(2, 2, 1, 'Good stamina during drills', NOW(), NOW()),
-(3, 3, 2, 'Strong performance in freestyle', NOW(), NOW()),
-(4, 4, 2, 'Improving dive technique', NOW(), NOW());
+(1, 1, 1, '2025-05-10', 'Significant improvement in backhand technique', NOW(), NOW()),
+(2, 2, 1, '2025-05-12', 'Good stamina during drills', NOW(), NOW()),
+(3, 3, 2, '2025-05-18', 'Strong performance in freestyle', NOW(), NOW()),
+(4, 4, 2, '2025-05-18', 'Improving dive technique', NOW(), NOW());
 
 SELECT setval('performance_notes_id_seq', (SELECT MAX(id) FROM performance_notes));
 
@@ -341,8 +324,8 @@ INSERT INTO session_attendance (session_id, player_id, status, created_at, updat
 
 
 // This endpoint should be protected and only accessible by the Super Admin
-// Use AuthenticatedRequest type for req
-export default authMiddleware(async (req: VercelRequest & { user?: Omit<User, 'password'> }, res: VercelResponse) => {
+// Use AuthenticatedRequest type for req (types are not needed at runtime in CJS)
+exports.handler = authMiddleware(async (req, res) => { // Changed export default to exports.handler
     if (req.method !== 'POST') {
         sendApiResponse(res, false, undefined, 'Method Not Allowed', 405);
         return;
@@ -355,7 +338,7 @@ export default authMiddleware(async (req: VercelRequest & { user?: Omit<User, 'p
     }
 
 
-    let client: PoolClient | undefined;
+    let client; // Use untyped variable for CJS
     try {
         client = await getConnection();
 
