@@ -4,7 +4,7 @@
 import { ApiResponse, User, Player, Coach, PlayerStats, TrainingSession, Attendance, Batch, Payment, Game } from '@/types/database.types';
 
 // Get the API URL from environment variables
-const API_URL = import.meta.env.VITE_API_URL; // <-- This line reads the environment variable
+const API_URL = import.meta.env.VITE_API_URL;
 
 if (!API_URL) {
     console.error("VITE_API_URL is not defined in the environment variables.");
@@ -34,7 +34,7 @@ async function callApi<T>(
       }),
     };
 
-    const response = await fetch(`${API_URL}${endpoint}`, { // <-- This line uses the API_URL variable
+    const response = await fetch(`${API_URL}${endpoint}`, {
       method,
       headers,
       body: data ? JSON.stringify(data) : undefined,
@@ -133,15 +133,18 @@ class DbService {
   async testConnection(): Promise<ApiResponse<{ connected: boolean; }>> {
       // Replace with a call to your backend's health check endpoint
       try {
+          // --- MODIFIED: Call the new /status endpoint ---
           const response = await fetch(`${API_URL}/status`); // Example endpoint
+          // --- END MODIFIED ---
+          const responseData = await response.json().catch(() => ({})); // Try to parse even on error
+
           if (response.ok) {
               return { data: { connected: true }, success: true };
           } else {
-               const errorData = await response.json().catch(() => ({})); // Try to parse error body
                return {
                    data: { connected: false },
                    success: false,
-                   error: errorData.message || `Backend status check failed: ${response.statusText}`
+                   error: responseData.message || `Backend status check failed: ${response.statusText}`
                };
           }
       } catch (error) {
@@ -149,7 +152,7 @@ class DbService {
            return {
                data: { connected: false },
                success: false,
-               error: error instanceof Error ? error.message : 'Network error during backend connection test'
+               error: error instanceof Error ? error.message : 'Network or unexpected error during backend connection test'
            };
       }
   }
@@ -158,12 +161,19 @@ class DbService {
   async resetDatabase(): Promise<ApiResponse<void>> {
        // Replace with a call to your backend's reset endpoint (use with caution!)
        try {
-           const response = await fetch(`${API_URL}/admin/reset-db`, { method: 'POST' }); // Example endpoint
+           // Explicitly call the /admin/reset-db endpoint relative to the API base path
+           const response = await fetch(`${API_URL}/admin/reset-db`, { // Use API_URL here
+               method: 'POST',
+                headers: { // Include auth header for admin endpoint
+                   'Authorization': `Bearer ${localStorage.getItem('authToken')}`
+                },
+           }); // Example endpoint
+           const errorData = await response.json().catch(() => ({})); // Try to parse error body
+
            if (response.ok) {
                console.log("Backend database reset initiated.");
                return { success: true };
            } else {
-                const errorData = await response.json().catch(() => ({}));
                 return {
                     success: false,
                     error: errorData.message || `Backend database reset failed: ${response.statusText}`
@@ -182,4 +192,3 @@ class DbService {
 // Export a singleton instance
 const dbService = new DbService();
 export default dbService;
-
