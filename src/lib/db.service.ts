@@ -3,8 +3,13 @@
 
 import { ApiResponse, User, Player, Coach, PlayerStats, TrainingSession, Attendance, Batch, Payment, Game } from '@/types/database.types';
 
-// Use a base path for API calls, typically '/api' when deployed on Vercel
-const API_BASE_PATH = import.meta.env.VITE_API_BASE_PATH || '/api';
+// Get the API URL from environment variables
+const API_URL = import.meta.env.VITE_API_URL; // <-- This line reads the environment variable
+
+if (!API_URL) {
+    console.error("VITE_API_URL is not defined in the environment variables.");
+    // You might want to throw an error or handle this case appropriately
+}
 
 
 /**
@@ -29,54 +34,26 @@ async function callApi<T>(
       }),
     };
 
-    // Construct the full URL using the base path and endpoint
-    // Ensure the endpoint starts with a '/' if API_BASE_PATH is defined
-    const fullUrl = `${API_BASE_PATH}${endpoint.startsWith('/') ? endpoint : '/' + endpoint}`;
-
-
-    const response = await fetch(fullUrl, { // Use fullUrl here
+    const response = await fetch(`${API_URL}${endpoint}`, { // <-- This line uses the API_URL variable
       method,
       headers,
       body: data ? JSON.stringify(data) : undefined,
     });
 
-    // Check if the response is JSON before parsing
-    const contentType = response.headers.get("content-type");
-    if (contentType && contentType.indexOf("application/json") !== -1) {
-         const responseData = await response.json();
+    const responseData = await response.json();
 
-         if (!response.ok) {
-           // Handle API errors (e.g., 400, 401, 404, 500 status codes)
-           return {
-             success: false,
-             error: responseData.message || `API Error: ${response.statusText}`,
-           };
-         }
-
-         // Assuming your backend API response structure is { success: boolean, data?: T, error?: string }
-         // The backend CJS files now return the data directly in the response body, not nested under 'data'
-         // Adjust this based on the *actual* response structure from your backend CJS files.
-         // Based on your CJS code, the response body *is* the data/error object.
-         return responseData;
-
-
-    } else {
-         // Handle non-JSON responses (e.g., plain text errors, HTML)
-         const text = await response.text();
-         if (!response.ok) {
-             return {
-                success: false,
-                error: `API Error: ${response.status} ${response.statusText} - ${text || 'No response body'}`,
-             };
-         }
-         // If it's not JSON but successful, maybe it's an empty response or unexpected format
-         console.warn(`Received non-JSON response from ${endpoint}:`, text);
-         return {
-             data: text as any, // Return text as data, type might be incorrect
-             success: true,
-         };
+    if (!response.ok) {
+      // Handle API errors (e.g., 400, 401, 404, 500 status codes)
+      return {
+        success: false,
+        error: responseData.message || `API Error: ${response.statusText}`,
+      };
     }
 
+    return {
+      data: responseData,
+      success: true,
+    };
 
   } catch (error) {
     console.error(`API call failed for ${method} ${endpoint}:`, error);
@@ -154,22 +131,34 @@ class DbService {
    * @returns Promise with connection status
    */
   async testConnection(): Promise<ApiResponse<{ connected: boolean; }>> {
-          // Calls the backend's /api/status endpoint
-          // Explicitly call the /status endpoint relative to the API base path
-          return callApi<{ connected: boolean }>('/auth/status');
+      // Replace with a call to your backend's health check endpoint
+      try {
+          const response = await fetch(`${API_URL}/status`); // Example endpoint
+          if (response.ok) {
+              return { data: { connected: true }, success: true };
+          } else {
+               const errorData = await response.json().catch(() => ({})); // Try to parse error body
+               return {
+                   data: { connected: false },
+                   success: false,
+                   error: errorData.message || `Backend status check failed: ${response.statusText}`
+               };
+          }
+      } catch (error) {
+           console.error('Backend connection test failed:', error);
+           return {
+               data: { connected: false },
+               success: false,
+               error: error instanceof Error ? error.message : 'Network error during backend connection test'
+           };
+      }
   }
 
   // The resetDatabase function would also need to call a backend endpoint
   async resetDatabase(): Promise<ApiResponse<void>> {
        // Replace with a call to your backend's reset endpoint (use with caution!)
        try {
-           // Explicitly call the /admin/reset-db endpoint relative to the API base path
-           const response = await fetch(`${API_BASE_PATH}/admin/reset-db`, { // Use API_BASE_PATH here
-               method: 'POST',
-                headers: { // Include auth header for admin endpoint
-                   'Authorization': `Bearer ${localStorage.getItem('authToken')}`
-                },
-           }); // Example endpoint
+           const response = await fetch(`${API_URL}/admin/reset-db`, { method: 'POST' }); // Example endpoint
            if (response.ok) {
                console.log("Backend database reset initiated.");
                return { success: true };
